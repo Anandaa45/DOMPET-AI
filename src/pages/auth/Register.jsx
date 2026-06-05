@@ -30,13 +30,19 @@ export default function Register() {
       const data = await registerClient(form)
 
       if (!data.session) {
-        setSuccess('Akun berhasil dibuat. Cek email kamu untuk konfirmasi sebelum login.')
+        setSuccess('Akun berhasil dibuat. Kalau Supabase meminta konfirmasi email, matikan Confirm email untuk development atau cek email sebelum login.')
         return
       }
 
       setSuccess('Akun berhasil dibuat. Silakan login.')
     } catch (err) {
-      setError(err.message || 'Register gagal. Coba lagi.')
+      const message = err.message || 'Register gagal. Coba lagi.'
+
+      if (message.toLowerCase().includes('email rate limit exceeded')) {
+        setError('Limit email Supabase sedang aktif. Tunggu beberapa menit atau matikan Confirm email di Supabase Authentication > Providers > Email.')
+      } else {
+        setError(message)
+      }
     } finally {
       setIsLoading(false)
     }

@@ -14,6 +14,18 @@ const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN
 app.use(cors())
 app.use(express.json())
 
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'dompet-ai-server',
+    endpoints: {
+      health: '/health',
+      webhookVerify: 'GET /webhook',
+      webhookReceive: 'POST /webhook',
+    },
+  })
+})
+
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
@@ -85,6 +97,15 @@ app.post('/webhook', async (req, res) => {
   })
 })
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Dompet AI server running on port ${port}`)
+})
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use. Stop the old server or set PORT to another value.`)
+    process.exit(1)
+  }
+
+  throw error
 })

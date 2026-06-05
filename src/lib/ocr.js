@@ -1,7 +1,7 @@
-import { createWorker } from 'tesseract.js'
+import { recognize } from 'tesseract.js'
 
 export async function readReceiptText(file, onProgress) {
-  const worker = await createWorker('ind+eng', 1, {
+  const { data } = await recognize(file, 'ind+eng', {
     logger: (message) => {
       if (message.status === 'recognizing text') {
         onProgress?.(Math.round(message.progress * 100))
@@ -9,10 +9,5 @@ export async function readReceiptText(file, onProgress) {
     },
   })
 
-  try {
-    const { data } = await worker.recognize(file)
-    return data.text.trim()
-  } finally {
-    await worker.terminate()
-  }
+  return data.text.trim()
 }

@@ -14,6 +14,37 @@ async function getCurrentUserId(client) {
   return data.user.id
 }
 
+function getToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function normalizeTransactionPayload(values) {
+  const type = values.type === 'income' || values.type === 'expense' ? values.type : null
+  const amount = Number(values.amount)
+  const description = String(values.description || '').trim()
+
+  if (!type) {
+    throw new Error('Type transaksi hanya boleh income atau expense.')
+  }
+
+  if (!description) {
+    throw new Error('Deskripsi transaksi wajib diisi.')
+  }
+
+  if (!Number.isFinite(amount)) {
+    throw new Error('Amount harus berupa angka.')
+  }
+
+  return {
+    type,
+    description,
+    amount,
+    category: values.category ? String(values.category).trim() : null,
+    transaction_date: values.transactionDate || getToday(),
+    merchant_name: values.merchantName ? String(values.merchantName).trim() : null,
+  }
+}
+
 export async function getCurrentUserTransactions() {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
@@ -32,9 +63,10 @@ export async function getCurrentUserTransactions() {
   return data
 }
 
-export async function getTransactions(filter = 'all') {
+export async function getTransactions(filter = 'all', search = '') {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
+  const keyword = search.trim()
 
   let query = client
     .from('transactions')
@@ -47,7 +79,52 @@ export async function getTransactions(filter = 'all') {
     query = query.eq('type', filter)
   }
 
+  if (keyword) {
+    query = query.or(`description.ilike.%${keyword}%,category.ilike.%${keyword}%`)
+  }
+
   const { data, error } = await query
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function getTransactionsByMonth(year, month) {
+  const client = getSupabaseClient()
+  const userId = await getCurrentUserId(client)
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+  const endDate = new Date(year, month, 0).toISOString().slice(0, 10)
+
+  const { data, error } = await client
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('transaction_date', startDate)
+    .lte('transaction_date', endDate)
+    .order('transaction_date', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function getReceiptScanTransactions() {
+  const client = getSupabaseClient()
+  const userId = await getCurrentUserId(client)
+
+  const { data, error } = await client
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('source', 'receipt_scan')
+    .order('transaction_date', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (error) {
     throw error
@@ -59,17 +136,13 @@ export async function getTransactions(filter = 'all') {
 export async function createTransaction(values) {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
+  const payload = normalizeTransactionPayload(values)
 
   const { data, error } = await client
     .from('transactions')
     .insert({
       user_id: userId,
-      type: values.type,
-      title: values.title,
-      amount: Number(values.amount),
-      category: values.category || null,
-      transaction_date: values.transactionDate,
-      notes: values.notes || null,
+      ...payload,
       receipt_image_url: values.receiptImageUrl || null,
       source: values.source || 'manual',
     })
@@ -121,13 +194,9 @@ export async function createReceiptTransaction(values, file) {
 export async function updateTransaction(id, values) {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
+  const payload = normalizeTransactionPayload(values)
   const updates = {
-    type: values.type,
-    title: values.title,
-    amount: Number(values.amount),
-    category: values.category || null,
-    transaction_date: values.transactionDate,
-    notes: values.notes || null,
+    ...payload,
     updated_at: new Date().toISOString(),
   }
 

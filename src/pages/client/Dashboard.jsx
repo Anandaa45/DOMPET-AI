@@ -50,6 +50,7 @@ export default function Dashboard() {
       topExpenseCategory: null,
       monthlyChart: [],
       categoryChart: [],
+      hasTransactions: transactions.length > 0,
     }
 
     const categoryTotals = new Map()
@@ -88,10 +89,10 @@ export default function Dashboard() {
         const category = transaction.category || 'Lainnya'
 
         initial.totalExpense += amount
-        categoryTotals.set(category, (categoryTotals.get(category) || 0) + amount)
 
         if (isThisMonth) {
           initial.monthlyExpense += amount
+          categoryTotals.set(category, (categoryTotals.get(category) || 0) + amount)
         }
 
         if (monthItem) {
@@ -145,7 +146,7 @@ export default function Dashboard() {
         : 'Belum ada',
       detail: dashboard.topExpenseCategory
         ? formatCurrency(dashboard.topExpenseCategory.amount)
-        : 'Tidak ada data expense',
+        : 'Tidak ada expense bulan ini',
       color: 'text-slate-950',
       isText: true,
     },
@@ -167,6 +168,15 @@ export default function Dashboard() {
 
       {error ? (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      ) : null}
+
+      {!isLoading && !error && !dashboard.hasTransactions ? (
+        <section className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-950">Belum ada transaksi</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            Tambahkan transaksi pertama kamu di halaman Transactions untuk melihat saldo, grafik, dan ringkasan keuangan.
+          </p>
+        </section>
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -213,8 +223,8 @@ export default function Dashboard() {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">Kategori expense</h3>
-          <p className="text-sm text-slate-500">Lima kategori pengeluaran terbesar.</p>
+          <h3 className="text-lg font-semibold text-slate-950">Kategori expense bulan ini</h3>
+          <p className="text-sm text-slate-500">Lima kategori pengeluaran terbesar bulan ini.</p>
 
           <div className="mt-5 h-80">
             {isLoading ? (
@@ -223,7 +233,7 @@ export default function Dashboard() {
               </div>
             ) : dashboard.categoryChart.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                Belum ada data expense.
+                Belum ada expense bulan ini.
               </div>
             ) : (
               <ResponsiveContainer height="100%" width="100%">
@@ -271,7 +281,7 @@ export default function Dashboard() {
             <thead>
               <tr className="border-b border-slate-200 text-slate-500">
                 <th className="py-3 pr-4 font-medium">Tanggal</th>
-                <th className="py-3 pr-4 font-medium">Judul</th>
+                <th className="py-3 pr-4 font-medium">Deskripsi</th>
                 <th className="py-3 pr-4 font-medium">Kategori</th>
                 <th className="py-3 pr-4 font-medium">Type</th>
                 <th className="py-3 text-right font-medium">Nominal</th>
@@ -294,7 +304,7 @@ export default function Dashboard() {
                 dashboard.latestTransactions.map((transaction) => (
                   <tr className="border-b border-slate-100" key={transaction.id}>
                     <td className="py-3 pr-4 text-slate-600">{transaction.transaction_date}</td>
-                    <td className="py-3 pr-4 font-medium text-slate-950">{transaction.title}</td>
+                    <td className="py-3 pr-4 font-medium text-slate-950">{transaction.description}</td>
                     <td className="py-3 pr-4 text-slate-600">{transaction.category || '-'}</td>
                     <td className="py-3 pr-4">
                       <span

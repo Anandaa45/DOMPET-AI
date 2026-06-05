@@ -9,11 +9,10 @@ import { parseTransactionsWithGemini } from '../../lib/gemini'
 
 const emptyForm = {
   type: 'expense',
-  title: '',
+  description: '',
   amount: '',
   category: '',
   transactionDate: new Date().toISOString().slice(0, 10),
-  notes: '',
 }
 
 const filters = [
@@ -25,6 +24,7 @@ const filters = [
 export default function Transactions() {
   const [transactions, setTransactions] = useState([])
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
@@ -53,12 +53,12 @@ export default function Transactions() {
     )
   }, [transactions])
 
-  async function loadTransactions(selectedFilter = filter) {
+  async function loadTransactions(selectedFilter = filter, selectedSearch = search) {
     setError('')
     setIsLoading(true)
 
     try {
-      const data = await getTransactions(selectedFilter)
+      const data = await getTransactions(selectedFilter, selectedSearch)
       setTransactions(data)
     } catch (err) {
       setError(err.message || 'Gagal mengambil transaksi.')
@@ -68,8 +68,8 @@ export default function Transactions() {
   }
 
   useEffect(() => {
-    loadTransactions(filter)
-  }, [filter])
+    loadTransactions(filter, search)
+  }, [filter, search])
 
   function updateField(event) {
     setForm((current) => ({
@@ -87,11 +87,10 @@ export default function Transactions() {
     setEditingId(transaction.id)
     setForm({
       type: transaction.type,
-      title: transaction.title,
+      description: transaction.description || '',
       amount: transaction.amount,
       category: transaction.category || '',
       transactionDate: transaction.transaction_date,
-      notes: transaction.notes || '',
     })
   }
 
@@ -108,7 +107,7 @@ export default function Transactions() {
       }
 
       resetForm()
-      await loadTransactions(filter)
+      await loadTransactions(filter, search)
     } catch (err) {
       setError(err.message || 'Gagal menyimpan transaksi.')
     } finally {
@@ -121,7 +120,7 @@ export default function Transactions() {
 
     try {
       await deleteTransaction(id)
-      await loadTransactions(filter)
+      await loadTransactions(filter, search)
     } catch (err) {
       setError(err.message || 'Gagal menghapus transaksi.')
     }
@@ -154,7 +153,7 @@ export default function Transactions() {
 
       setAiText('')
       setAiPreview([])
-      await loadTransactions(filter)
+      await loadTransactions(filter, search)
     } catch (err) {
       setAiError(err.message || 'Gagal menyimpan hasil AI.')
     } finally {
@@ -258,18 +257,17 @@ export default function Transactions() {
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
                     <th className="py-3 pr-4 font-medium">Tanggal</th>
-                    <th className="py-3 pr-4 font-medium">Judul</th>
+                    <th className="py-3 pr-4 font-medium">Deskripsi</th>
                     <th className="py-3 pr-4 font-medium">Type</th>
                     <th className="py-3 pr-4 font-medium">Kategori</th>
                     <th className="py-3 pr-4 text-right font-medium">Nominal</th>
-                    <th className="py-3 font-medium">Catatan</th>
                   </tr>
                 </thead>
                 <tbody>
                   {aiPreview.map((transaction, index) => (
-                    <tr className="border-b border-slate-200" key={`${transaction.title}-${index}`}>
+                    <tr className="border-b border-slate-200" key={`${transaction.description}-${index}`}>
                       <td className="py-3 pr-4 text-slate-600">{transaction.transactionDate}</td>
-                      <td className="py-3 pr-4 font-medium text-slate-950">{transaction.title}</td>
+                      <td className="py-3 pr-4 font-medium text-slate-950">{transaction.description}</td>
                       <td className="py-3 pr-4">
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -285,7 +283,6 @@ export default function Transactions() {
                       <td className="py-3 pr-4 text-right font-medium text-slate-950">
                         {formatCurrency(transaction.amount)}
                       </td>
-                      <td className="py-3 text-slate-600">{transaction.notes || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -316,12 +313,12 @@ export default function Transactions() {
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Judul</span>
+              <span className="text-sm font-medium text-slate-700">Deskripsi</span>
               <input
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="title"
+                name="description"
                 type="text"
-                value={form.title}
+                value={form.description}
                 onChange={updateField}
                 required
               />
@@ -363,15 +360,6 @@ export default function Transactions() {
               />
             </label>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Catatan</span>
-              <textarea
-                className="mt-1 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="notes"
-                value={form.notes}
-                onChange={updateField}
-              />
-            </label>
           </div>
 
           {error ? (
@@ -399,24 +387,37 @@ export default function Transactions() {
         </form>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-slate-950">Daftar transaksi</h3>
-            <div className="flex rounded-md border border-slate-200 bg-slate-50 p-1">
-              {filters.map((item) => (
-                <button
-                  className={`rounded px-3 py-1.5 text-sm font-medium ${
-                    filter === item.value
-                      ? 'bg-white text-emerald-700 shadow-sm'
-                      : 'text-slate-600'
-                  }`}
-                  key={item.value}
-                  type="button"
-                  onClick={() => setFilter(item.value)}
-                >
-                  {item.label}
-                </button>
-              ))}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <h3 className="text-lg font-semibold text-slate-950">Daftar transaksi</h3>
+              <div className="flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                {filters.map((item) => (
+                  <button
+                    className={`rounded px-3 py-1.5 text-sm font-medium ${
+                      filter === item.value
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-slate-600'
+                    }`}
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFilter(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Search deskripsi atau kategori</span>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="Cari makan, transportasi, gaji..."
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
           </div>
 
           <div className="mt-5 overflow-x-auto">
@@ -424,7 +425,7 @@ export default function Transactions() {
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
                   <th className="py-3 pr-4 font-medium">Tanggal</th>
-                  <th className="py-3 pr-4 font-medium">Judul</th>
+                  <th className="py-3 pr-4 font-medium">Deskripsi</th>
                   <th className="py-3 pr-4 font-medium">Type</th>
                   <th className="py-3 pr-4 font-medium">Kategori</th>
                   <th className="py-3 pr-4 text-right font-medium">Nominal</th>
@@ -451,7 +452,7 @@ export default function Transactions() {
                         {transaction.transaction_date}
                       </td>
                       <td className="py-3 pr-4 font-medium text-slate-950">
-                        {transaction.title}
+                        {transaction.description}
                       </td>
                       <td className="py-3 pr-4">
                         <span

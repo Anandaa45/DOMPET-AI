@@ -102,7 +102,7 @@ export async function processWhatsAppTextMessage(message) {
 
   const summary = data
     .map((transaction) => {
-      return `- ${transaction.title}: ${formatCurrency(transaction.amount)} (${transaction.type})`
+      return `- ${transaction.description}: ${formatCurrency(transaction.amount)} (${transaction.type})`
     })
     .join('\n')
 
@@ -183,20 +183,20 @@ export async function processWhatsAppImageMessage(message) {
       message_id: message.id,
     },
   })
-  const title = receipt.description || receipt.merchant || 'Transaksi nota'
+  const description = receipt.description || receipt.merchant || 'Transaksi nota'
 
   const { data, error } = await supabase
     .from('transactions')
     .insert({
       user_id: profile.id,
       type: 'expense',
-      title,
+      description,
       amount: receipt.total,
       category: receipt.category || null,
       transaction_date: receipt.transactionDate,
       source: 'whatsapp_receipt',
       receipt_image_url: receiptImageUrl,
-      notes: receipt.merchant ? `Merchant: ${receipt.merchant}` : null,
+      merchant_name: receipt.merchant || null,
     })
     .select()
     .single()

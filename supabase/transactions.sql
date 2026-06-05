@@ -2,16 +2,22 @@ create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   type text not null check (type in ('income', 'expense')),
-  title text not null,
-  amount numeric(14, 2) not null check (amount >= 0),
   category text,
+  description text not null,
+  amount numeric(14, 2) not null check (amount >= 0),
   transaction_date date not null default current_date,
   source text not null default 'manual',
+  merchant_name text,
   receipt_image_url text,
-  notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.transactions
+add column if not exists description text;
+
+alter table public.transactions
+add column if not exists merchant_name text;
 
 alter table public.transactions
 add column if not exists receipt_image_url text;
@@ -48,3 +54,5 @@ on public.transactions
 for delete
 to authenticated
 using (auth.uid() = user_id);
+
+notify pgrst, 'reload schema';

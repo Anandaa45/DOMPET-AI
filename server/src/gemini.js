@@ -31,11 +31,10 @@ function normalizeTransaction(transaction) {
 
   return {
     type,
-    title: String(transaction.title || '').trim(),
+    description: String(transaction.description || transaction.title || '').trim(),
     amount: Number(transaction.amount || 0),
     category: String(transaction.category || '').trim() || null,
     transaction_date: transaction.transactionDate || today,
-    notes: String(transaction.notes || '').trim() || null,
     source: 'whatsapp_text',
   }
 }
@@ -60,14 +59,14 @@ Ubah pesan WhatsApp transaksi keuangan berikut menjadi JSON.
 Aturan:
 - Balas hanya JSON valid, tanpa markdown.
 - Format harus: {"transactions":[...]}
-- Setiap item punya field: type, title, amount, category, transactionDate, notes.
+- Setiap item punya field: type, description, amount, category, transactionDate.
 - type hanya "income" atau "expense".
 - Jika pesan berisi pembelian/pengeluaran, gunakan type "expense".
 - Jika pesan berisi gaji, bonus, transfer masuk, pemasukan, gunakan type "income".
 - amount harus angka tanpa pemisah ribuan.
 - transactionDate pakai format YYYY-MM-DD. Jika tidak ada tanggal, pakai tanggal hari ini: ${new Date().toISOString().slice(0, 10)}.
 - category ringkas, misalnya Makanan, Transportasi, Belanja, Tagihan, Gaji, Lainnya.
-- notes boleh string kosong.
+- description berisi deskripsi transaksi singkat.
 
 Pesan WhatsApp:
 "${messageText}"
@@ -114,7 +113,7 @@ Pesan WhatsApp:
   }
 
   return transactions.map(normalizeTransaction).filter((transaction) => {
-    return transaction.title && transaction.amount > 0
+    return transaction.description && transaction.amount > 0
   })
 }
 

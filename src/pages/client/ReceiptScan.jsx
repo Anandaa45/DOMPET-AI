@@ -1,44 +1,84 @@
 import { useEffect, useState } from 'react'
-import { parseReceiptWithGemini } from '../../lib/gemini'
 import { readReceiptText } from '../../lib/ocr'
-import { createReceiptTransaction } from '../../lib/transactions'
+import { createReceiptTransaction, getReceiptScanTransactions } from '../../lib/transactions'
 
-function buildTransactionFromReceipt(receipt) {
-  return {
-    type: 'expense',
-    title: receipt.description || receipt.merchantName || 'Transaksi nota',
-    amount: receipt.amount,
-    category: receipt.category || 'Lainnya',
-    transactionDate: receipt.transactionDate,
-    notes: receipt.merchantName ? `Merchant: ${receipt.merchantName}` : '',
-  }
+const emptyForm = {
+  merchantName: '',
+  transactionDate: new Date().toISOString().slice(0, 10),
+  category: '',
+  description: '',
+  amount: '',
 }
 
-const initialOcrProgress = 0
+function cleanOcrLines(text) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
 
-const emptyReceipt = null
+function parseAmount(value) {
+  const cleaned = value.replace(/[^\d.,]/g, '')
 
-const emptyTransaction = {
-  type: 'expense',
-  title: '',
-  amount: '',
-  category: '',
-  transactionDate: new Date().toISOString().slice(0, 10),
-  notes: '',
+  if (!cleaned) {
+    return ''
+  }
+
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    return Number(cleaned.replace(/\./g, '').replace(',', '.'))
+  }
+
+  if (cleaned.includes(',')) {
+    return Number(cleaned.replace(',', '.'))
+  }
+
+  return Number(cleaned.replace(/\./g, ''))
+}
+
+function getAmountFromTotal(text) {
+  const totalLine = cleanOcrLines(text)
+    .filter((line) => /total/i.test(line))
+    .at(-1)
+  const totalMatch = totalLine?.match(/(\d[\d.,]*)\s*$/)
+
+  if (!totalMatch) {
+    return ''
+  }
+
+  const amount = parseAmount(totalMatch[1])
+
+  return Number.isFinite(amount) ? String(amount) : ''
+}
+
+function buildFormFromOcr(text) {
+  const lines = cleanOcrLines(text)
+  const merchantName = lines[0] || ''
+  const amount = getAmountFromTotal(text)
+
+  return {
+    merchantName,
+    category: 'Belanja Harian',
+    description: merchantName ? `Belanja di ${merchantName}` : '',
+    amount,
+  }
 }
 
 export default function ReceiptScan() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
+  const [form, setForm] = useState(emptyForm)
   const [ocrText, setOcrText] = useState('')
-  const [ocrProgress, setOcrProgress] = useState(initialOcrProgress)
-  const [receiptPreview, setReceiptPreview] = useState(emptyReceipt)
-  const [transactionPreview, setTransactionPreview] = useState(emptyTransaction)
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [receiptTransactions, setReceiptTransactions] = useState([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
   const [isReading, setIsReading] = useState(false)
-  const [isParsing, setIsParsing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+
+  useEffect(() => {
+    loadReceiptTransactions()
+  }, [])
 
   useEffect(() => {
     if (!file) {
@@ -52,8 +92,22 @@ export default function ReceiptScan() {
     return () => URL.revokeObjectURL(objectUrl)
   }, [file])
 
+  async function loadReceiptTransactions() {
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const data = await getReceiptScanTransactions()
+      setReceiptTransactions(data)
+    } catch (err) {
+      setError(err.message || 'Gagal memuat riwayat scan nota.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function updateField(event) {
-    setTransactionPreview((current) => ({
+    setForm((current) => ({
       ...current,
       [event.target.name]: event.target.value,
     }))
@@ -65,9 +119,7 @@ export default function ReceiptScan() {
     setError('')
     setSuccess('')
     setOcrText('')
-    setOcrProgress(initialOcrProgress)
-    setReceiptPreview(emptyReceipt)
-    setTransactionPreview(emptyTransaction)
+    setOcrProgress(0)
 
     if (!selectedFile) {
       setFile(null)
@@ -81,6 +133,7 @@ export default function ReceiptScan() {
     }
 
     setFile(selectedFile)
+    setForm(emptyForm)
   }
 
   async function handleReadReceipt() {
@@ -88,32 +141,34 @@ export default function ReceiptScan() {
     setSuccess('')
 
     if (!file) {
-      setError('Pilih foto nota terlebih dahulu.')
+      setError('Pilih gambar nota terlebih dahulu.')
       return
     }
 
     setIsReading(true)
-    setIsParsing(false)
-    setOcrProgress(initialOcrProgress)
-    setReceiptPreview(emptyReceipt)
+    setOcrProgress(0)
 
     try {
       const text = await readReceiptText(file, setOcrProgress)
       setOcrText(text)
 
       if (!text) {
-        throw new Error('Teks nota tidak terbaca. Coba gunakan foto yang lebih jelas.')
+        setError('Teks nota tidak terbaca. Coba gunakan foto yang lebih jelas.')
+        return
       }
 
-      setIsParsing(true)
-      const receipt = await parseReceiptWithGemini(text)
-      setReceiptPreview(receipt)
-      setTransactionPreview(buildTransactionFromReceipt(receipt))
+      const parsedFields = buildFormFromOcr(text)
+      setForm((current) => ({
+        ...current,
+        merchantName: parsedFields.merchantName || current.merchantName,
+        category: current.category || parsedFields.category,
+        description: current.description || parsedFields.description,
+        amount: parsedFields.amount || current.amount,
+      }))
     } catch (err) {
-      setError(err.message || 'Gagal membaca nota.')
+      setError(err.message || 'Gagal membaca nota dengan OCR.')
     } finally {
       setIsReading(false)
-      setIsParsing(false)
     }
   }
 
@@ -123,31 +178,41 @@ export default function ReceiptScan() {
     setSuccess('')
 
     if (!file) {
-      setError('Pilih foto nota terlebih dahulu.')
-      return
-    }
-
-    if (!receiptPreview) {
-      setError('Jalankan OCR dan cek preview sebelum menyimpan.')
+      setError('Pilih gambar nota terlebih dahulu.')
       return
     }
 
     setIsUploading(true)
 
     try {
-      await createReceiptTransaction(transactionPreview, file)
-      setTransactionPreview(emptyTransaction)
-      setReceiptPreview(emptyReceipt)
-      setOcrText('')
-      setOcrProgress(initialOcrProgress)
+      await createReceiptTransaction(
+        {
+          ...form,
+          type: 'expense',
+          source: 'receipt_scan',
+        },
+        file,
+      )
+      setForm(emptyForm)
       setFile(null)
+      setOcrText('')
+      setOcrProgress(0)
       event.target.reset()
       setSuccess('Nota berhasil diupload dan transaksi tersimpan.')
+      await loadReceiptTransactions()
     } catch (err) {
-      setError(err.message || 'Gagal upload nota.')
+      setError(err.message || 'Gagal menyimpan scan nota.')
     } finally {
       setIsUploading(false)
     }
+  }
+
+  function formatCurrency(value) {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    }).format(Number(value))
   }
 
   return (
@@ -158,11 +223,11 @@ export default function ReceiptScan() {
         </p>
         <h2 className="mt-2 text-3xl font-semibold text-slate-950">Receipt Scan</h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Pilih foto nota, jalankan OCR, cek hasil AI, lalu simpan ke Dompet AI.
+          Upload foto nota, isi detail transaksi, lalu simpan sebagai expense.
         </p>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
+      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
           <h3 className="text-lg font-semibold text-slate-950">Upload nota</h3>
 
@@ -178,134 +243,109 @@ export default function ReceiptScan() {
               />
             </label>
 
+            <div className="overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50">
+              {previewUrl ? (
+                <img
+                  alt="Preview nota"
+                  className="max-h-80 w-full object-contain"
+                  src={previewUrl}
+                />
+              ) : (
+                <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-slate-500">
+                  Preview gambar nota akan tampil di sini.
+                </div>
+              )}
+            </div>
+
             <button
               className="w-full rounded-md bg-slate-950 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={!file || isReading || isParsing || isUploading}
+              disabled={!file || isReading || isUploading}
               type="button"
               onClick={handleReadReceipt}
             >
-              {isReading ? `OCR ${ocrProgress}%` : isParsing ? 'Parsing dengan AI...' : 'Baca nota dengan OCR'}
+              {isReading ? `Membaca nota ${ocrProgress}%` : 'Baca Nota'}
             </button>
 
-            {ocrText ? (
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700">Hasil teks OCR</span>
-                <textarea
-                  className="mt-1 min-h-40 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none"
-                  readOnly
-                  value={ocrText}
-                />
-              </label>
+            {isReading ? (
+              <div className="rounded-md bg-slate-50 px-3 py-2">
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-emerald-600 transition-all"
+                    style={{ width: `${ocrProgress}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  OCR sedang membaca teks dari gambar nota.
+                </p>
+              </div>
             ) : null}
-          </div>
-
-          {receiptPreview ? (
-            <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-                Preview AI
-              </p>
-              <dl className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-slate-600">Merchant</dt>
-                  <dd className="font-medium text-slate-950">{receiptPreview.merchantName}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-slate-600">Tanggal</dt>
-                  <dd className="font-medium text-slate-950">{receiptPreview.transactionDate}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-slate-600">Nominal</dt>
-                  <dd className="font-medium text-slate-950">
-                    {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency: 'IDR',
-                      maximumFractionDigits: 0,
-                    }).format(receiptPreview.amount)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-slate-600">Kategori</dt>
-                  <dd className="font-medium text-slate-950">{receiptPreview.category}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-600">Deskripsi</dt>
-                  <dd className="mt-1 font-medium text-slate-950">{receiptPreview.description}</dd>
-                </div>
-              </dl>
-            </div>
-          ) : null}
-
-          <div className="mt-6 space-y-4">
-            <h3 className="text-lg font-semibold text-slate-950">Preview transaksi</h3>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Type</span>
-              <select
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="type"
-                value={transactionPreview.type}
-                onChange={updateField}
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
+              <span className="text-sm font-medium text-slate-700">Hasil teks OCR</span>
+              <textarea
+                className="mt-1 min-h-36 w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                placeholder="Hasil OCR akan tampil setelah tombol Baca Nota diklik."
+                value={ocrText}
+                onChange={(event) => setOcrText(event.target.value)}
+              />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Judul</span>
+              <span className="text-sm font-medium text-slate-700">Merchant name</span>
               <input
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="title"
+                name="merchantName"
                 type="text"
-                value={transactionPreview.title}
+                value={form.merchantName}
+                onChange={updateField}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Transaction date</span>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                name="transactionDate"
+                type="date"
+                value={form.transactionDate}
                 onChange={updateField}
                 required
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Nominal</span>
+              <span className="text-sm font-medium text-slate-700">Category</span>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                name="category"
+                type="text"
+                value={form.category}
+                onChange={updateField}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Description</span>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                name="description"
+                type="text"
+                value={form.description}
+                onChange={updateField}
+                required
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Amount</span>
               <input
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                 min="0"
                 name="amount"
                 type="number"
-                value={transactionPreview.amount}
+                value={form.amount}
                 onChange={updateField}
                 required
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Kategori</span>
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="category"
-                type="text"
-                value={transactionPreview.category}
-                onChange={updateField}
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Tanggal</span>
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="transactionDate"
-                type="date"
-                value={transactionPreview.transactionDate}
-                onChange={updateField}
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Catatan</span>
-              <textarea
-                className="mt-1 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                name="notes"
-                value={transactionPreview.notes}
-                onChange={updateField}
               />
             </label>
           </div>
@@ -319,38 +359,70 @@ export default function ReceiptScan() {
 
           <button
             className="mt-5 w-full rounded-md bg-emerald-600 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={isUploading || !receiptPreview}
+            disabled={isUploading}
             type="submit"
           >
-            {isUploading ? 'Mengupload nota...' : 'Upload dan simpan'}
+            {isUploading ? 'Mengupload...' : 'Upload dan simpan'}
           </button>
         </form>
 
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-950">Preview nota</h3>
-              <p className="text-sm text-slate-500">Gambar belum diupload sebelum tombol simpan ditekan.</p>
-            </div>
-            {isReading || isParsing || isUploading ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
-                {isReading ? 'OCR' : isParsing ? 'AI' : 'Uploading'}
-              </span>
-            ) : null}
-          </div>
+          <h3 className="text-lg font-semibold text-slate-950">Riwayat scan nota</h3>
 
-          <div className="mt-5 flex min-h-[420px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
-            {previewUrl ? (
-              <img
-                alt="Preview nota"
-                className="max-h-[560px] w-full rounded-md object-contain"
-                src={previewUrl}
-              />
-            ) : (
-              <p className="text-center text-sm text-slate-500">
-                Pilih file gambar untuk melihat preview nota.
-              </p>
-            )}
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-3 pr-4 font-medium">Tanggal</th>
+                  <th className="py-3 pr-4 font-medium">Merchant</th>
+                  <th className="py-3 pr-4 font-medium">Deskripsi</th>
+                  <th className="py-3 pr-4 font-medium">Kategori</th>
+                  <th className="py-3 pr-4 text-right font-medium">Nominal</th>
+                  <th className="py-3 text-right font-medium">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td className="py-6 text-center text-slate-500" colSpan="6">
+                      Memuat riwayat scan...
+                    </td>
+                  </tr>
+                ) : receiptTransactions.length === 0 ? (
+                  <tr>
+                    <td className="py-8 text-center text-slate-500" colSpan="6">
+                      Belum ada scan nota.
+                    </td>
+                  </tr>
+                ) : (
+                  receiptTransactions.map((transaction) => (
+                    <tr className="border-b border-slate-100" key={transaction.id}>
+                      <td className="py-3 pr-4 text-slate-600">{transaction.transaction_date}</td>
+                      <td className="py-3 pr-4 text-slate-600">{transaction.merchant_name || '-'}</td>
+                      <td className="py-3 pr-4 font-medium text-slate-950">{transaction.description}</td>
+                      <td className="py-3 pr-4 text-slate-600">{transaction.category || '-'}</td>
+                      <td className="py-3 pr-4 text-right font-medium text-slate-950">
+                        {formatCurrency(transaction.amount)}
+                      </td>
+                      <td className="py-3 text-right">
+                        {transaction.receipt_image_url ? (
+                          <a
+                            className="font-medium text-emerald-700"
+                            href={transaction.receipt_image_url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Lihat
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
       </section>
