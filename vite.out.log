@@ -1,0 +1,20 @@
+
+> dompet-ai@0.0.0 dev
+> vite --host 127.0.0.1 --port 5173 --strictPort
+
+
+  [32m[1mVITE[22m v7.3.5[39m  [2mready in [0m[1m729[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m22.24.07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m22.24.07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Login.jsx[22m
+[2m22.24.08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Register.jsx[22m
+[2m22.25.12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m22.25.46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33m@supabase/supabase-js[32m[39m
+[2m22.25.46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2m22.26.14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/Login.jsx, /src/pages/auth/Register.jsx, /src/index.css[22m
+[2m22.29.03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Login.jsx, /src/pages/auth/Register.jsx[22m
+[2m22.29.03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/auth/Login.jsx, /src/pages/auth/Register.jsx, /src/index.css[22m
+[2m22.29.03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/client/Transactions.jsx[22m
+[2m22.33.44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/client/Dashboard.jsx[22m
+[2m22.36.15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/client/Transactions.jsx[22m
