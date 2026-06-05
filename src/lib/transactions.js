@@ -70,7 +70,8 @@ export async function createTransaction(values) {
       category: values.category || null,
       transaction_date: values.transactionDate,
       notes: values.notes || null,
-      source: 'manual',
+      receipt_image_url: values.receiptImageUrl || null,
+      source: values.source || 'manual',
     })
     .select()
     .single()
@@ -82,21 +83,61 @@ export async function createTransaction(values) {
   return data
 }
 
+export async function uploadReceiptImage(file) {
+  const client = getSupabaseClient()
+  const userId = await getCurrentUserId(client)
+  const extension = file.name.split('.').pop() || 'jpg'
+  const safeName = file.name
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[^a-z0-9-]+/gi, '-')
+    .toLowerCase()
+  const filePath = `${userId}/${Date.now()}-${safeName}.${extension}`
+
+  const { error } = await client.storage.from('receipts').upload(filePath, file, {
+    cacheControl: '3600',
+    contentType: file.type,
+    upsert: false,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  const { data } = client.storage.from('receipts').getPublicUrl(filePath)
+
+  return data.publicUrl
+}
+
+export async function createReceiptTransaction(values, file) {
+  const receiptImageUrl = await uploadReceiptImage(file)
+
+  return createTransaction({
+    ...values,
+    receiptImageUrl,
+    source: 'receipt_scan',
+  })
+}
+
 export async function updateTransaction(id, values) {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
+  const updates = {
+    type: values.type,
+    title: values.title,
+    amount: Number(values.amount),
+    category: values.category || null,
+    transaction_date: values.transactionDate,
+    notes: values.notes || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (Object.prototype.hasOwnProperty.call(values, 'receiptImageUrl')) {
+    updates.receipt_image_url = values.receiptImageUrl || null
+  }
 
   const { data, error } = await client
     .from('transactions')
-    .update({
-      type: values.type,
-      title: values.title,
-      amount: Number(values.amount),
-      category: values.category || null,
-      transaction_date: values.transactionDate,
-      notes: values.notes || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id)
     .eq('user_id', userId)
     .select()

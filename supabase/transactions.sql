@@ -7,10 +7,14 @@ create table if not exists public.transactions (
   category text,
   transaction_date date not null default current_date,
   source text not null default 'manual',
+  receipt_image_url text,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.transactions
+add column if not exists receipt_image_url text;
 
 create index if not exists transactions_user_id_idx
 on public.transactions (user_id);
@@ -30,7 +34,7 @@ create policy "Users can create their own manual transactions"
 on public.transactions
 for insert
 to authenticated
-with check (auth.uid() = user_id and source = 'manual');
+with check (auth.uid() = user_id and source in ('manual', 'receipt_scan'));
 
 create policy "Users can update their own transactions"
 on public.transactions
