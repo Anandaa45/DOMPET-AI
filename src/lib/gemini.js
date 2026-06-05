@@ -39,6 +39,18 @@ function normalizeTransaction(transaction) {
   }
 }
 
+function normalizeReceiptTransaction(receipt) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  return {
+    merchantName: String(receipt.merchant_name || '').trim(),
+    transactionDate: receipt.transaction_date || today,
+    amount: Number(receipt.amount || 0),
+    category: String(receipt.category || '').trim(),
+    description: String(receipt.description || '').trim(),
+  }
+}
+
 export async function parseTransactionsWithGemini(text) {
   const apiKey = getGeminiApiKey()
   const prompt = `
@@ -102,4 +114,72 @@ Kalimat user:
   return transactions.map(normalizeTransaction).filter((transaction) => {
     return transaction.title && transaction.amount > 0
   })
+}
+
+export async function parseReceiptWithGemini(ocrText) {
+  const apiKey = getGeminiApiKey()
+  const prompt = `
+Ekstrak data nota dari teks OCR berikut menjadi JSON.
+
+Aturan:
+- Balas hanya JSON valid, tanpa markdown.
+- Format harus:
+  {
+    "merchant_name": "nama merchant",
+    "transaction_date": "YYYY-MM-DD",
+    "amount": 0,
+    "category": "kategori",
+    "description": "deskripsi singkat"
+  }
+- amount adalah total akhir transaksi, angka tanpa pemisah ribuan.
+- Jika tanggal tidak jelas, gunakan tanggal hari ini: ${new Date().toISOString().slice(0, 10)}.
+- category pilih kategori ringkas seperti Makanan, Transportasi, Belanja, Kesehatan, Tagihan, Hiburan, Lainnya.
+- description ringkas, cocok dipakai sebagai judul transaksi.
+- Jika merchant tidak jelas, isi "Nota".
+
+Teks OCR:
+${ocrText}
+`
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(`Gemini API gagal: ${message}`)
+  }
+
+  const data = await response.json()
+  const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+  if (!resultText) {
+    throw new Error('Gemini tidak mengembalikan hasil parsing nota.')
+  }
+
+  const parsed = extractJson(resultText)
+  const receipt = normalizeReceiptTransaction(parsed)
+
+  if (!receipt.amount || receipt.amount <= 0) {
+    throw new Error('Total transaksi tidak ditemukan dari hasil OCR.')
+  }
+
+  return receipt
 }
