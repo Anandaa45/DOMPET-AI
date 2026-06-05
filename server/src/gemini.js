@@ -40,6 +40,18 @@ function normalizeTransaction(transaction) {
   }
 }
 
+function normalizeReceipt(receipt) {
+  const today = new Date().toISOString().slice(0, 10)
+
+  return {
+    merchant: String(receipt.merchant || receipt.merchant_name || 'Nota').trim(),
+    total: Number(receipt.total || receipt.amount || 0),
+    transactionDate: receipt.transaction_date || receipt.transactionDate || today,
+    category: String(receipt.category || 'Lainnya').trim(),
+    description: String(receipt.description || '').trim(),
+  }
+}
+
 export async function parseTransactionsFromMessage(messageText) {
   const apiKey = getGeminiApiKey()
   const prompt = `
@@ -104,4 +116,71 @@ Pesan WhatsApp:
   return transactions.map(normalizeTransaction).filter((transaction) => {
     return transaction.title && transaction.amount > 0
   })
+}
+
+export async function parseReceiptFromOcrText(ocrText) {
+  const apiKey = getGeminiApiKey()
+  const prompt = `
+Ekstrak data transaksi dari teks OCR nota berikut menjadi JSON.
+
+Aturan:
+- Balas hanya JSON valid, tanpa markdown.
+- Format harus:
+  {
+    "merchant": "nama merchant",
+    "total": 0,
+    "transaction_date": "YYYY-MM-DD",
+    "category": "kategori",
+    "description": "deskripsi transaksi"
+  }
+- total adalah grand total/total akhir yang dibayar, angka tanpa pemisah ribuan.
+- transaction_date pakai format YYYY-MM-DD. Jika tidak ada tanggal, pakai tanggal hari ini: ${new Date().toISOString().slice(0, 10)}.
+- category ringkas, misalnya Makanan, Transportasi, Belanja, Tagihan, Kesehatan, Hiburan, Lainnya.
+- description cocok dipakai sebagai judul transaksi.
+- Jika merchant tidak jelas, isi "Nota".
+
+Teks OCR:
+${ocrText}
+`
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(`Gemini API failed: ${message}`)
+  }
+
+  const data = await response.json()
+  const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+  if (!resultText) {
+    throw new Error('Gemini did not return parsed receipt.')
+  }
+
+  const receipt = normalizeReceipt(extractJson(resultText))
+
+  if (!receipt.total || receipt.total <= 0) {
+    throw new Error('Receipt total was not found.')
+  }
+
+  return receipt
 }

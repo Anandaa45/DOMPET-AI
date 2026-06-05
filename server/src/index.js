@@ -4,7 +4,8 @@ import express from 'express'
 
 dotenv.config()
 
-const { processWhatsAppTextMessage } = await import('./messageProcessor.js')
+const { processWhatsAppImageMessage, processWhatsAppTextMessage } = await import('./messageProcessor.js')
+const { logSystemEvent } = await import('./logger.js')
 
 const app = express()
 const port = process.env.PORT || 4000
@@ -48,6 +49,7 @@ app.post('/webhook', async (req, res) => {
         id: message.id,
         type: message.type,
         text: message.text?.body || null,
+        mediaId: message.image?.id || null,
       })
 
       if (message.type === 'text') {
@@ -55,6 +57,28 @@ app.post('/webhook', async (req, res) => {
           await processWhatsAppTextMessage(message)
         } catch (error) {
           console.error('Failed to process WhatsApp text message:', error)
+          await logSystemEvent('whatsapp_text_error', error.message, {
+            severity: 'error',
+            metadata: {
+              message_id: message.id,
+              type: message.type,
+            },
+          })
+        }
+      }
+
+      if (message.type === 'image') {
+        try {
+          await processWhatsAppImageMessage(message)
+        } catch (error) {
+          console.error('Failed to process WhatsApp image message:', error)
+          await logSystemEvent('whatsapp_receipt_error', error.message, {
+            severity: 'error',
+            metadata: {
+              message_id: message.id,
+              type: message.type,
+            },
+          })
         }
       }
     }

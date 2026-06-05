@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AdminLayout from '../components/layout/AdminLayout.jsx'
+import AdminRoute from '../components/layout/AdminRoute.jsx'
 import ClientLayout from '../components/layout/ClientLayout.jsx'
 import AdminDashboard from '../pages/admin/AdminDashboard.jsx'
 import AdminLogs from '../pages/admin/AdminLogs.jsx'
@@ -31,10 +32,12 @@ export default function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
       </Route>
 
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="users" element={<AdminUsers />} />
-        <Route path="logs" element={<AdminLogs />} />
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="logs" element={<AdminLogs />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/welcome" replace />} />

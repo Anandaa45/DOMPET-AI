@@ -29,3 +29,23 @@
 [2m22.59.11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33mtesseract.js[32m[39m
 [2m22.59.11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ optimized dependencies changed. reloading[39m
 [2m23.01.25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/client/WhatsAppConnect.jsx[22m
+[2m23.38.31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.jsx, /src/index.css[22m
+[2m23.38.31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/admin/AdminDashboard.jsx[22m
+[2m23.38.31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/admin/AdminUsers.jsx[22m
+[2m23.38.31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/admin/AdminUsers.jsx[22m
+[2m23.38.31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/admin/AdminLogs.jsx[22m
+[2m00.09.33[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m00.09.34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Login.jsx, /src/pages/auth/Register.jsx, /src/pages/client/Transactions.jsx, /src/pages/client/Dashboard.jsx, /src/pages/client/ReceiptScan.jsx, /src/pages/admin/AdminDashboard.jsx, /src/pages/admin/AdminLogs.jsx, /src/pages/admin/AdminUsers.jsx, /src/components/layout/AdminRoute.jsx, /src/pages/client/WhatsAppConnect.jsx[22m
+[2m00.09.35[22m [36m[1m[vite][22m[39m server restarted.
+[2m00.11.55[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m00.11.55[22m [36m[1m[vite][22m[39m server restarted.
+[2m00.15.16[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m00.15.16[22m [36m[1m[vite][22m[39m server restarted.
+[2m00.16.31[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m00.16.31[22m [36m[1m[vite][22m[39m server restarted.
+[2m00.18.28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/admin/AdminUsers.jsx, /src/pages/admin/AdminLogs.jsx, /src/pages/admin/AdminDashboard.jsx, /src/pages/client/WhatsAppConnect.jsx, /src/components/layout/AdminRoute.jsx, /src/pages/auth/Register.jsx, /src/pages/auth/Login.jsx, /src/pages/client/ReceiptScan.jsx, /src/pages/client/Transactions.jsx, /src/pages/client/Dashboard.jsx[22m
+[2m00.21.41[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m00.21.41[22m [36m[1m[vite][22m[39m server restarted.
+[2m00.24.20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Register.jsx, /src/pages/auth/Login.jsx[22m
+[2m00.24.20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Login.jsx[22m
+[2m00.24.20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Register.jsx[22m

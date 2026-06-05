@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { loginWithEmail } from '../../lib/auth'
+import { loginWithEmail, resendConfirmationEmail } from '../../lib/auth'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -9,7 +9,10 @@ export default function Login() {
     password: '',
   })
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isEmailNotConfirmed, setIsEmailNotConfirmed] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isResending, setIsResending] = useState(false)
 
   function updateField(event) {
     setForm((current) => ({
@@ -21,6 +24,8 @@ export default function Login() {
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    setSuccess('')
+    setIsEmailNotConfirmed(false)
     setIsLoading(true)
 
     try {
@@ -33,9 +38,31 @@ export default function Login() {
 
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(err.message || 'Login gagal. Coba lagi.')
+      const message = err.message || 'Login gagal. Coba lagi.'
+
+      if (message.toLowerCase().includes('email not confirmed')) {
+        setIsEmailNotConfirmed(true)
+        setError('Email belum dikonfirmasi. Cek inbox atau spam, lalu klik link konfirmasi dari Supabase.')
+      } else {
+        setError(message)
+      }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function handleResendConfirmation() {
+    setError('')
+    setSuccess('')
+    setIsResending(true)
+
+    try {
+      await resendConfirmationEmail(form.email)
+      setSuccess('Email konfirmasi sudah dikirim ulang. Cek inbox atau spam.')
+    } catch (err) {
+      setError(err.message || 'Gagal mengirim ulang email konfirmasi.')
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -77,6 +104,19 @@ export default function Login() {
 
           {error ? (
             <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          ) : null}
+          {success ? (
+            <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>
+          ) : null}
+          {isEmailNotConfirmed ? (
+            <button
+              className="w-full rounded-md border border-emerald-200 px-4 py-2 font-medium text-emerald-700 disabled:cursor-not-allowed disabled:text-slate-400"
+              disabled={isResending || !form.email}
+              type="button"
+              onClick={handleResendConfirmation}
+            >
+              {isResending ? 'Mengirim...' : 'Kirim ulang email konfirmasi'}
+            </button>
           ) : null}
 
           <button

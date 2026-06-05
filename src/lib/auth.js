@@ -68,3 +68,15 @@ export async function loginWithEmail({ email, password }) {
 
   return { session: data.session, user: data.user, profile }
 }
+
+export async function resendConfirmationEmail(email) {
+  const client = getSupabaseClient()
+  const { error } = await client.auth.resend({
+    type: 'signup',
+    email,
+  })
+
+  if (error) {
+    throw error
+  }
+}

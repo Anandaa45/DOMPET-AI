@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { registerClient } from '../../lib/auth'
 
 export default function Register() {
-  const navigate = useNavigate()
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -11,6 +10,7 @@ export default function Register() {
     password: '',
   })
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   function updateField(event) {
@@ -23,11 +23,18 @@ export default function Register() {
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    setSuccess('')
     setIsLoading(true)
 
     try {
-      await registerClient(form)
-      navigate('/login', { replace: true })
+      const data = await registerClient(form)
+
+      if (!data.session) {
+        setSuccess('Akun berhasil dibuat. Cek email kamu untuk konfirmasi sebelum login.')
+        return
+      }
+
+      setSuccess('Akun berhasil dibuat. Silakan login.')
     } catch (err) {
       setError(err.message || 'Register gagal. Coba lagi.')
     } finally {
@@ -98,6 +105,9 @@ export default function Register() {
 
           {error ? (
             <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          ) : null}
+          {success ? (
+            <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>
           ) : null}
 
           <button

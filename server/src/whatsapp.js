@@ -37,3 +37,47 @@ export async function sendWhatsAppText(to, text) {
 
   return response.json()
 }
+
+export async function getWhatsAppMediaUrl(mediaId) {
+  const { accessToken } = getWhatsAppConfig()
+  const response = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(`WhatsApp media metadata failed: ${message}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.url) {
+    throw new Error('WhatsApp media URL was not returned.')
+  }
+
+  return data.url
+}
+
+export async function downloadWhatsAppMedia(mediaId) {
+  const { accessToken } = getWhatsAppConfig()
+  const mediaUrl = await getWhatsAppMediaUrl(mediaId)
+  const response = await fetch(mediaUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(`WhatsApp media download failed: ${message}`)
+  }
+
+  const arrayBuffer = await response.arrayBuffer()
+
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    contentType: response.headers.get('content-type') || 'image/jpeg',
+  }
+}
