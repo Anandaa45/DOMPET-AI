@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -11,10 +12,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { getBudgetsWithSpending } from '../../lib/budgets'
+import { getSavingGoals } from '../../lib/savingGoals'
 import { getCurrentUserTransactions } from '../../lib/transactions'
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([])
+  const [savingGoals, setSavingGoals] = useState([])
+  const [budgets, setBudgets] = useState([])
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -24,8 +29,14 @@ export default function Dashboard() {
       setIsLoading(true)
 
       try {
-        const data = await getCurrentUserTransactions()
+        const [data, goalsData, budgetsData] = await Promise.all([
+          getCurrentUserTransactions(),
+          getSavingGoals(),
+          getBudgetsWithSpending(),
+        ])
         setTransactions(data)
+        setSavingGoals(goalsData)
+        setBudgets(budgetsData)
       } catch (err) {
         setError(err.message || 'Gagal memuat dashboard.')
       } finally {
@@ -115,6 +126,48 @@ export default function Dashboard() {
     }
   }, [transactions])
 
+  const mainSavingGoal = useMemo(() => {
+    const activeGoal = savingGoals.find((goal) => goal.status === 'active') || null
+
+    if (!activeGoal) {
+      return null
+    }
+
+    const targetAmount = Number(activeGoal.target_amount || 0)
+    const currentAmount = Number(activeGoal.current_amount || 0)
+    const progress = targetAmount > 0
+      ? Math.min(100, Math.round((currentAmount / targetAmount) * 100))
+      : 0
+
+    return {
+      ...activeGoal,
+      progress,
+    }
+  }, [savingGoals])
+
+  const budgetSummary = useMemo(() => {
+    return budgets.reduce(
+      (summary, budget) => {
+        const limitAmount = Number(budget.limit_amount || 0)
+        const actualExpense = Number(budget.actual_expense || 0)
+        const usage = limitAmount > 0 ? (actualExpense / limitAmount) * 100 : 0
+
+        if (budget.status === 'active' || !budget.status) {
+          summary.active += 1
+        }
+
+        if (usage >= 100) {
+          summary.exceeded += 1
+        } else if (usage >= 80) {
+          summary.nearLimit += 1
+        }
+
+        return summary
+      },
+      { active: 0, nearLimit: 0, exceeded: 0 },
+    )
+  }, [budgets])
+
   function formatCurrency(value) {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -191,6 +244,88 @@ export default function Dashboard() {
             ) : null}
           </div>
         ))}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-slate-500">Target Tabungan Utama</p>
+              <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                {mainSavingGoal ? mainSavingGoal.title : 'Belum ada target aktif'}
+              </h3>
+            </div>
+            <Link className="text-sm font-medium text-emerald-700" to="/saving-goals">
+              Lihat Target
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <p className="mt-5 text-sm text-slate-500">Memuat target...</p>
+          ) : mainSavingGoal ? (
+            <div className="mt-5">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-sm text-slate-500">Terkumpul</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-950">
+                    {formatCurrency(mainSavingGoal.current_amount)}
+                  </p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-sm text-slate-500">Target</p>
+                  <p className="mt-1 font-semibold text-slate-950">
+                    {formatCurrency(mainSavingGoal.target_amount)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700">Progress</span>
+                  <span className="font-semibold text-emerald-700">{mainSavingGoal.progress}%</span>
+                </div>
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-600 transition-all"
+                    style={{ width: `${mainSavingGoal.progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-slate-500">
+              Buat target tabungan aktif untuk menampilkan progres di dashboard.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-slate-500">Status Budget</p>
+              <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                Ringkasan penggunaan budget
+              </h3>
+            </div>
+            <Link className="text-sm font-medium text-emerald-700" to="/budgets">
+              Lihat Budget
+            </Link>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-md bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">Budget aktif</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-950">{budgetSummary.active}</p>
+            </div>
+            <div className="rounded-md bg-amber-50 p-3">
+              <p className="text-xs text-amber-700">Hampir habis</p>
+              <p className="mt-1 text-2xl font-semibold text-amber-700">{budgetSummary.nearLimit}</p>
+            </div>
+            <div className="rounded-md bg-red-50 p-3">
+              <p className="text-xs text-red-700">Terlewati</p>
+              <p className="mt-1 text-2xl font-semibold text-red-700">{budgetSummary.exceeded}</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">

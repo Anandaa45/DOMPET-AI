@@ -1,0 +1,21 @@
+Gemini AI error detail: {
+  name: 'ApiError',
+  message: '{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]}}',
+  cause: null,
+  stack: 'ApiError: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]}}\n' +
+    '    at throwErrorIfNotOK (file:///C:/laragon/www/Dompet%20AI/server/node_modules/@google/genai/dist/node/index.mjs:13487:30)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+    '    at async file:///C:/laragon/www/Dompet%20AI/server/node_modules/@google/genai/dist/node/index.mjs:13190:13\n' +
+    '    at async Models.generateContent (file:///C:/laragon/www/Dompet%20AI/server/node_modules/@google/genai/dist/node/index.mjs:14595:24)\n' +
+    '    at async generateJsonWithRetry (file:///C:/laragon/www/Dompet%20AI/server/src/services/genaiService.js:395:24)\n' +
+    '    at async parseTransactionWithGenAi (file:///C:/laragon/www/Dompet%20AI/server/src/services/genaiService.js:449:24)\n' +
+    '    at async parseTransaction (file:///C:/laragon/www/Dompet%20AI/server/src/controllers/aiController.js:68:26)'
+}
+Error: Request AI ditolak. Cek format input atau konfigurasi model Gemini.
+    at createAiError (file:///C:/laragon/www/Dompet%20AI/server/src/services/genaiService.js:352:29)
+    at generateJsonWithRetry (file:///C:/laragon/www/Dompet%20AI/server/src/services/genaiService.js:424:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async parseTransactionWithGenAi (file:///C:/laragon/www/Dompet%20AI/server/src/services/genaiService.js:449:24)
+    at async parseTransaction (file:///C:/laragon/www/Dompet%20AI/server/src/controllers/aiController.js:68:26) {
+  status: 400
+}

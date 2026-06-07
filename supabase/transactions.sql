@@ -40,7 +40,7 @@ create policy "Users can create their own manual transactions"
 on public.transactions
 for insert
 to authenticated
-with check (auth.uid() = user_id and source in ('manual', 'receipt_scan', 'whatsapp_text', 'whatsapp_receipt'));
+with check (auth.uid() = user_id and source in ('manual', 'ai_text', 'receipt_scan', 'whatsapp_text', 'whatsapp_receipt'));
 
 create policy "Users can update their own transactions"
 on public.transactions

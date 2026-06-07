@@ -38,7 +38,7 @@ export async function updateWhatsAppNumber(whatsappNumber) {
   const { data, error } = await client
     .from('profiles')
     .update({
-      whatsapp_number: whatsappNumber,
+      whatsapp_number: whatsappNumber || '',
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId)

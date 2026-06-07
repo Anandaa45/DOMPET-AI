@@ -133,6 +133,25 @@ export async function getReceiptScanTransactions() {
   return data
 }
 
+export async function getWhatsAppTextTransactions() {
+  const client = getSupabaseClient()
+  const userId = await getCurrentUserId(client)
+
+  const { data, error } = await client
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('source', 'whatsapp_text')
+    .order('transaction_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
 export async function createTransaction(values) {
   const client = getSupabaseClient()
   const userId = await getCurrentUserId(client)
@@ -148,6 +167,32 @@ export async function createTransaction(values) {
     })
     .select()
     .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function createTransactions(valuesList) {
+  const client = getSupabaseClient()
+  const userId = await getCurrentUserId(client)
+  const rows = valuesList.map((values) => {
+    const payload = normalizeTransactionPayload(values)
+
+    return {
+      user_id: userId,
+      ...payload,
+      receipt_image_url: values.receiptImageUrl || null,
+      source: values.source || 'manual',
+    }
+  })
+
+  const { data, error } = await client
+    .from('transactions')
+    .insert(rows)
+    .select()
 
   if (error) {
     throw error

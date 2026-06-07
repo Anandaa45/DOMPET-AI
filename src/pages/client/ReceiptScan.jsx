@@ -10,6 +10,8 @@ const emptyForm = {
   amount: '',
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000'
+
 function cleanOcrLines(text) {
   return text
     .split(/\r?\n/)
@@ -63,17 +65,48 @@ function buildFormFromOcr(text) {
   }
 }
 
+async function parseReceiptWithAi(ocrText) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/parse-receipt`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ocrText }),
+  })
+
+  const result = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(result?.message || 'AI gagal membaca nota.')
+  }
+
+  return result?.data || result
+}
+
+function buildFormFromAi(receipt) {
+  return {
+    merchantName: receipt?.merchant_name || '',
+    transactionDate: receipt?.transaction_date || '',
+    category: receipt?.category || '',
+    description: receipt?.description || '',
+    amount: receipt?.amount === null || receipt?.amount === undefined ? '' : String(receipt.amount),
+  }
+}
+
 export default function ReceiptScan() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [ocrText, setOcrText] = useState('')
   const [ocrProgress, setOcrProgress] = useState(0)
+  const [receiptItems, setReceiptItems] = useState([])
   const [receiptTransactions, setReceiptTransactions] = useState([])
   const [error, setError] = useState('')
+  const [aiError, setAiError] = useState('')
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isReading, setIsReading] = useState(false)
+  const [isParsingAi, setIsParsingAi] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
@@ -120,6 +153,8 @@ export default function ReceiptScan() {
     setSuccess('')
     setOcrText('')
     setOcrProgress(0)
+    setAiError('')
+    setReceiptItems([])
 
     if (!selectedFile) {
       setFile(null)
@@ -136,9 +171,35 @@ export default function ReceiptScan() {
     setForm(emptyForm)
   }
 
+  async function fillFormWithAi(text) {
+    setAiError('')
+    setIsParsingAi(true)
+
+    try {
+      const receipt = await parseReceiptWithAi(text)
+      const parsedFields = buildFormFromAi(receipt)
+
+      setReceiptItems(Array.isArray(receipt?.items) ? receipt.items : [])
+      setForm((current) => ({
+        ...current,
+        merchantName: parsedFields.merchantName || current.merchantName,
+        transactionDate: parsedFields.transactionDate || current.transactionDate,
+        category: parsedFields.category || current.category,
+        description: parsedFields.description || current.description,
+        amount: parsedFields.amount || current.amount,
+      }))
+    } catch (err) {
+      setAiError(err.message || 'AI gagal membaca nota. Kamu tetap bisa isi form manual.')
+    } finally {
+      setIsParsingAi(false)
+    }
+  }
+
   async function handleReadReceipt() {
     setError('')
+    setAiError('')
     setSuccess('')
+    setReceiptItems([])
 
     if (!file) {
       setError('Pilih gambar nota terlebih dahulu.')
@@ -165,6 +226,8 @@ export default function ReceiptScan() {
         description: current.description || parsedFields.description,
         amount: parsedFields.amount || current.amount,
       }))
+
+      await fillFormWithAi(text)
     } catch (err) {
       setError(err.message || 'Gagal membaca nota dengan OCR.')
     } finally {
@@ -197,6 +260,8 @@ export default function ReceiptScan() {
       setFile(null)
       setOcrText('')
       setOcrProgress(0)
+      setAiError('')
+      setReceiptItems([])
       event.target.reset()
       setSuccess('Nota berhasil diupload dan transaksi tersimpan.')
       await loadReceiptTransactions()
@@ -259,7 +324,7 @@ export default function ReceiptScan() {
 
             <button
               className="w-full rounded-md bg-slate-950 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={!file || isReading || isUploading}
+              disabled={!file || isReading || isParsingAi || isUploading}
               type="button"
               onClick={handleReadReceipt}
             >
@@ -280,6 +345,12 @@ export default function ReceiptScan() {
               </div>
             ) : null}
 
+            {isParsingAi ? (
+              <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                AI sedang merapikan hasil OCR menjadi data transaksi...
+              </div>
+            ) : null}
+
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Hasil teks OCR</span>
               <textarea
@@ -289,6 +360,30 @@ export default function ReceiptScan() {
                 onChange={(event) => setOcrText(event.target.value)}
               />
             </label>
+
+            {aiError ? (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">{aiError}</p>
+            ) : null}
+
+            {receiptItems.length > 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-semibold text-slate-950">Items dari nota</p>
+                <div className="mt-3 space-y-2">
+                  {receiptItems.map((item, index) => (
+                    <div
+                      className="grid grid-cols-[1fr_auto] gap-3 rounded-md bg-white px-3 py-2 text-sm"
+                      key={`${item.item_name}-${index}`}
+                    >
+                      <div>
+                        <p className="font-medium text-slate-950">{item.item_name}</p>
+                        <p className="text-xs text-slate-500">Qty: {item.quantity || 1}</p>
+                      </div>
+                      <p className="font-medium text-slate-950">{formatCurrency(item.price || 0)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Merchant name</span>

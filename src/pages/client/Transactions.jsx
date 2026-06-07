@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   createTransaction,
+  createTransactions,
   deleteTransaction,
   getTransactions,
   updateTransaction,
 } from '../../lib/transactions'
-import { parseTransactionsWithGemini } from '../../lib/gemini'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000'
 
 const emptyForm = {
   type: 'expense',
@@ -21,6 +23,50 @@ const filters = [
   { value: 'expense', label: 'Expense' },
 ]
 
+const categoryOptions = [
+  'Makanan',
+  'Transportasi',
+  'Belanja Harian',
+  'Kesehatan',
+  'Pendidikan',
+  'Tagihan',
+  'Hiburan',
+  'Gaji',
+  'Uang Jajan',
+  'Lainnya',
+]
+
+function getToday() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function normalizeAiPreview(transactions) {
+  return transactions.map((transaction) => ({
+    type: transaction.type === 'income' ? 'income' : 'expense',
+    category: transaction.category || 'Lainnya',
+    description: transaction.description || '',
+    amount: transaction.amount === null || transaction.amount === undefined ? '' : String(transaction.amount),
+    transactionDate: transaction.transaction_date || '',
+  }))
+}
+
+async function parseTransactionsWithAi(text) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/parse-transaction`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text }),
+  })
+  const result = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    throw new Error(result?.message || 'AI gagal memproses transaksi.')
+  }
+
+  return Array.isArray(result?.data) ? result.data : []
+}
+
 export default function Transactions() {
   const [transactions, setTransactions] = useState([])
   const [filter, setFilter] = useState('all')
@@ -28,6 +74,8 @@ export default function Transactions() {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [isAiOpen, setIsAiOpen] = useState(false)
   const [aiText, setAiText] = useState('')
   const [aiPreview, setAiPreview] = useState([])
   const [aiError, setAiError] = useState('')
@@ -97,6 +145,7 @@ export default function Transactions() {
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    setSuccess('')
     setIsSaving(true)
 
     try {
@@ -107,6 +156,7 @@ export default function Transactions() {
       }
 
       resetForm()
+      setSuccess(editingId ? 'Transaksi berhasil diperbarui.' : 'Transaksi berhasil ditambahkan.')
       await loadTransactions(filter, search)
     } catch (err) {
       setError(err.message || 'Gagal menyimpan transaksi.')
@@ -117,9 +167,11 @@ export default function Transactions() {
 
   async function handleDelete(id) {
     setError('')
+    setSuccess('')
 
     try {
       await deleteTransaction(id)
+      setSuccess('Transaksi berhasil dihapus.')
       await loadTransactions(filter, search)
     } catch (err) {
       setError(err.message || 'Gagal menghapus transaksi.')
@@ -133,8 +185,8 @@ export default function Transactions() {
     setIsAiParsing(true)
 
     try {
-      const parsedTransactions = await parseTransactionsWithGemini(aiText)
-      setAiPreview(parsedTransactions)
+      const parsedTransactions = await parseTransactionsWithAi(aiText)
+      setAiPreview(normalizeAiPreview(parsedTransactions))
     } catch (err) {
       setAiError(err.message || 'Gagal membaca transaksi dengan AI.')
     } finally {
@@ -144,21 +196,58 @@ export default function Transactions() {
 
   async function handleSaveAiPreview() {
     setAiError('')
+    setSuccess('')
     setIsAiSaving(true)
 
     try {
-      for (const transaction of aiPreview) {
-        await createTransaction(transaction)
-      }
+      await createTransactions(aiPreview.map((transaction) => ({
+        ...transaction,
+        amount: Number(transaction.amount),
+        transactionDate: transaction.transactionDate || getToday(),
+        source: 'ai_text',
+      })))
 
       setAiText('')
       setAiPreview([])
+      setIsAiOpen(false)
+      setSuccess('Semua transaksi AI berhasil disimpan.')
       await loadTransactions(filter, search)
     } catch (err) {
       setAiError(err.message || 'Gagal menyimpan hasil AI.')
     } finally {
       setIsAiSaving(false)
     }
+  }
+
+  function openAiPanel() {
+    setIsAiOpen(true)
+    setAiError('')
+  }
+
+  function closeAiPanel() {
+    if (isAiParsing || isAiSaving) {
+      return
+    }
+
+    setIsAiOpen(false)
+    setAiError('')
+  }
+
+  function updateAiPreview(index, field, value) {
+    setAiPreview((current) => current.map((transaction, transactionIndex) => {
+      if (transactionIndex !== index) {
+        return transaction
+      }
+
+      return {
+        ...transaction,
+        [field]: value,
+      }
+    }))
+  }
+
+  function removeAiPreview(index) {
+    setAiPreview((current) => current.filter((_, transactionIndex) => transactionIndex !== index))
   }
 
   function formatCurrency(value) {
@@ -171,11 +260,20 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-          Dompet AI
-        </p>
-        <h2 className="mt-2 text-3xl font-semibold text-slate-950">Transactions</h2>
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+            Dompet AI
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold text-slate-950">Transactions</h2>
+        </div>
+        <button
+          className="rounded-md bg-slate-950 px-4 py-2 font-medium text-white"
+          type="button"
+          onClick={openAiPanel}
+        >
+          Catat dengan AI
+        </button>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -199,98 +297,150 @@ export default function Transactions() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-emerald-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
-            Catat dengan AI
-          </p>
-          <h3 className="text-lg font-semibold text-slate-950">Ubah kalimat jadi transaksi</h3>
-        </div>
+      {success ? (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>
+      ) : null}
 
-        <form className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto]" onSubmit={handleAiParse}>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Kalimat transaksi</span>
-            <textarea
-              className="mt-1 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="beli makan 15000 dan bensin 25000"
-              value={aiText}
-              onChange={(event) => setAiText(event.target.value)}
-              required
-            />
-          </label>
-          <div className="flex items-end">
-            <button
-              className="h-10 rounded-md bg-slate-950 px-4 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={isAiParsing}
-              type="submit"
-            >
-              {isAiParsing ? 'Membaca...' : 'Parse AI'}
-            </button>
-          </div>
-        </form>
-
-        {aiError ? (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{aiError}</p>
-        ) : null}
-
-        {aiPreview.length > 0 ? (
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {isAiOpen ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 px-4 py-6">
+          <section className="mx-auto max-w-5xl rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h4 className="font-semibold text-slate-950">Preview hasil AI</h4>
-                <p className="text-sm text-slate-600">
-                  Periksa dulu sebelum menyimpan ke Supabase.
+                <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+                  Catat dengan AI
                 </p>
+                <h3 className="mt-1 text-xl font-semibold text-slate-950">
+                  Ubah kalimat jadi transaksi
+                </h3>
               </div>
               <button
-                className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={isAiSaving}
+                className="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isAiParsing || isAiSaving}
                 type="button"
-                onClick={handleSaveAiPreview}
+                onClick={closeAiPanel}
               >
-                {isAiSaving ? 'Menyimpan...' : 'Simpan hasil AI'}
+                Tutup
               </button>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-3 pr-4 font-medium">Tanggal</th>
-                    <th className="py-3 pr-4 font-medium">Deskripsi</th>
-                    <th className="py-3 pr-4 font-medium">Type</th>
-                    <th className="py-3 pr-4 font-medium">Kategori</th>
-                    <th className="py-3 pr-4 text-right font-medium">Nominal</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <form className="mt-5 space-y-4" onSubmit={handleAiParse}>
+              <label className="block">
+                <span className="text-sm font-medium text-slate-700">Kalimat transaksi</span>
+                <textarea
+                  className="mt-1 min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  placeholder="Contoh: beli makan 20 ribu, bensin 30 ribu, dan dapat uang jajan 100 ribu"
+                  value={aiText}
+                  onChange={(event) => setAiText(event.target.value)}
+                  required
+                />
+              </label>
+              <button
+                className="rounded-md bg-slate-950 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={isAiParsing}
+                type="submit"
+              >
+                {isAiParsing ? 'Memproses...' : 'Proses dengan AI'}
+              </button>
+            </form>
+
+            {aiError ? (
+              <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{aiError}</p>
+            ) : null}
+
+            {aiPreview.length > 0 ? (
+              <div className="mt-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="font-semibold text-slate-950">Preview transaksi</h4>
+                    <p className="text-sm text-slate-600">
+                      Edit atau hapus hasil sebelum disimpan.
+                    </p>
+                  </div>
+                  <button
+                    className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                    disabled={isAiSaving || aiPreview.length === 0}
+                    type="button"
+                    onClick={handleSaveAiPreview}
+                  >
+                    {isAiSaving ? 'Menyimpan...' : 'Simpan Semua'}
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
                   {aiPreview.map((transaction, index) => (
-                    <tr className="border-b border-slate-200" key={`${transaction.description}-${index}`}>
-                      <td className="py-3 pr-4 text-slate-600">{transaction.transactionDate}</td>
-                      <td className="py-3 pr-4 font-medium text-slate-950">{transaction.description}</td>
-                      <td className="py-3 pr-4">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            transaction.type === 'income'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {transaction.type}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">{transaction.category || '-'}</td>
-                      <td className="py-3 pr-4 text-right font-medium text-slate-950">
-                        {formatCurrency(transaction.amount)}
-                      </td>
-                    </tr>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4" key={`ai-${index}`}>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[130px_160px_1fr_140px_150px_auto]">
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">Type</span>
+                          <select
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            value={transaction.type}
+                            onChange={(event) => updateAiPreview(index, 'type', event.target.value)}
+                          >
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">Kategori</span>
+                          <select
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            value={transaction.category}
+                            onChange={(event) => updateAiPreview(index, 'category', event.target.value)}
+                          >
+                            {categoryOptions.map((category) => (
+                              <option key={category} value={category}>{category}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">Deskripsi</span>
+                          <input
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            type="text"
+                            value={transaction.description}
+                            onChange={(event) => updateAiPreview(index, 'description', event.target.value)}
+                            required
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">Nominal</span>
+                          <input
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            min="0"
+                            type="number"
+                            value={transaction.amount}
+                            onChange={(event) => updateAiPreview(index, 'amount', event.target.value)}
+                            required
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">Tanggal</span>
+                          <input
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                            type="date"
+                            value={transaction.transactionDate}
+                            onChange={(event) => updateAiPreview(index, 'transactionDate', event.target.value)}
+                          />
+                        </label>
+                        <div className="flex items-end">
+                          <button
+                            className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700"
+                            type="button"
+                            onClick={() => removeAiPreview(index)}
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null}
-      </section>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>

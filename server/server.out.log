@@ -1,1 +1,5 @@
-Dompet AI server running on port 4000
+
+> dompet-ai-server@0.1.0 dev
+> node src/server.js
+
+Dompet AI server running on port 9000

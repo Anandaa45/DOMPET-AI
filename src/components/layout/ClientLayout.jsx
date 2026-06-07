@@ -6,6 +6,8 @@ const navItems = [
   { to: '/receipt-scan', label: 'Receipt Scan' },
   { to: '/whatsapp', label: 'WhatsApp' },
   { to: '/reports', label: 'Reports' },
+  { to: '/budgets', label: 'Budget' },
+  { to: '/saving-goals', label: 'Target Tabungan' },
   { to: '/settings', label: 'Settings' },
 ]
 

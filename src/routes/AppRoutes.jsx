@@ -7,9 +7,11 @@ import AdminLogs from '../pages/admin/AdminLogs.jsx'
 import AdminUsers from '../pages/admin/AdminUsers.jsx'
 import Login from '../pages/auth/Login.jsx'
 import Register from '../pages/auth/Register.jsx'
+import Budgets from '../pages/client/Budgets.jsx'
 import Dashboard from '../pages/client/Dashboard.jsx'
 import ReceiptScan from '../pages/client/ReceiptScan.jsx'
 import Reports from '../pages/client/Reports.jsx'
+import SavingGoals from '../pages/client/SavingGoals.jsx'
 import Settings from '../pages/client/Settings.jsx'
 import Transactions from '../pages/client/Transactions.jsx'
 import WhatsAppConnect from '../pages/client/WhatsAppConnect.jsx'
@@ -29,6 +31,8 @@ export default function AppRoutes() {
         <Route path="/receipt-scan" element={<ReceiptScan />} />
         <Route path="/whatsapp" element={<WhatsAppConnect />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/budgets" element={<Budgets />} />
+        <Route path="/saving-goals" element={<SavingGoals />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 
