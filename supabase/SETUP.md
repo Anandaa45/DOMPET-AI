@@ -132,19 +132,23 @@ create policy "Users can update their own profile"
 -- transactions
 alter table public.transactions enable row level security;
 
+drop policy if exists "Users can read their own transactions" on public.transactions;
 create policy "Users can read their own transactions"
   on public.transactions for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can create their own manual transactions" on public.transactions;
 create policy "Users can create their own manual transactions"
   on public.transactions for insert to authenticated
   with check (auth.uid() = user_id and source in ('manual', 'ai_text', 'receipt_scan', 'whatsapp_text', 'whatsapp_receipt'));
 
+drop policy if exists "Users can update their own transactions" on public.transactions;
 create policy "Users can update their own transactions"
   on public.transactions for update to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete their own transactions" on public.transactions;
 create policy "Users can delete their own transactions"
   on public.transactions for delete to authenticated
   using (auth.uid() = user_id);
@@ -152,19 +156,23 @@ create policy "Users can delete their own transactions"
 -- budgets
 alter table public.budgets enable row level security;
 
+drop policy if exists "Users can read their own budgets" on public.budgets;
 create policy "Users can read their own budgets"
   on public.budgets for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can create their own budgets" on public.budgets;
 create policy "Users can create their own budgets"
   on public.budgets for insert to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own budgets" on public.budgets;
 create policy "Users can update their own budgets"
   on public.budgets for update to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete their own budgets" on public.budgets;
 create policy "Users can delete their own budgets"
   on public.budgets for delete to authenticated
   using (auth.uid() = user_id);
@@ -172,19 +180,23 @@ create policy "Users can delete their own budgets"
 -- saving_goals
 alter table public.saving_goals enable row level security;
 
+drop policy if exists "Users can read their own saving goals" on public.saving_goals;
 create policy "Users can read their own saving goals"
   on public.saving_goals for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can create their own saving goals" on public.saving_goals;
 create policy "Users can create their own saving goals"
   on public.saving_goals for insert to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own saving goals" on public.saving_goals;
 create policy "Users can update their own saving goals"
   on public.saving_goals for update to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete their own saving goals" on public.saving_goals;
 create policy "Users can delete their own saving goals"
   on public.saving_goals for delete to authenticated
   using (auth.uid() = user_id);
@@ -192,19 +204,23 @@ create policy "Users can delete their own saving goals"
 -- categories
 alter table public.categories enable row level security;
 
+drop policy if exists "Users can read their own categories" on public.categories;
 create policy "Users can read their own categories"
   on public.categories for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can create their own categories" on public.categories;
 create policy "Users can create their own categories"
   on public.categories for insert to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own categories" on public.categories;
 create policy "Users can update their own categories"
   on public.categories for update to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can delete their own categories" on public.categories;
 create policy "Users can delete their own categories"
   on public.categories for delete to authenticated
   using (auth.uid() = user_id);
@@ -212,10 +228,12 @@ create policy "Users can delete their own categories"
 -- system_logs (public write, no RLS needed since only server writes)
 alter table public.system_logs enable row level security;
 
+drop policy if exists "Anyone can insert system logs" on public.system_logs;
 create policy "Anyone can insert system logs"
   on public.system_logs for insert to authenticated
   with check (true);
 
+drop policy if exists "Admins can read system logs" on public.system_logs;
 create policy "Admins can read system logs"
   on public.system_logs for select to authenticated
   using (
