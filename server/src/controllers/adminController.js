@@ -70,7 +70,7 @@ export async function getAdminLogs(req, res, next) {
     const sb = getAdminSupabase()
     const limit = Math.min(parseInt(req.query.limit) || 50, 100)
 
-    const { data, error } = await sb.rpc('get_admin_logs', { p_limit: limit })
+    const { data, error } = await sb.rpc('get_admin_logs', { limit_count: limit })
 
     if (error) {
       console.error('RPC get_admin_logs error:', error)
