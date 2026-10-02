@@ -2,7 +2,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text not null,
   email text not null unique,
-  whatsapp_number text not null,
+  whatsapp_number text,
   role text not null default 'client' check (role in ('client', 'super_admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
