@@ -8,6 +8,7 @@ import AdminUsers from '../pages/admin/AdminUsers.jsx'
 import Login from '../pages/auth/Login.jsx'
 import Register from '../pages/auth/Register.jsx'
 import Budgets from '../pages/client/Budgets.jsx'
+import Categories from '../pages/client/Categories.jsx'
 import Dashboard from '../pages/client/Dashboard.jsx'
 import ReceiptScan from '../pages/client/ReceiptScan.jsx'
 import Reports from '../pages/client/Reports.jsx'
@@ -28,6 +29,7 @@ export default function AppRoutes() {
       <Route element={<ClientLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
+        <Route path="/categories" element={<Categories />} />
         <Route path="/receipt-scan" element={<ReceiptScan />} />
         <Route path="/whatsapp" element={<WhatsAppConnect />} />
         <Route path="/reports" element={<Reports />} />

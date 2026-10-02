@@ -5,6 +5,9 @@ import {
   getBudgetsWithSpending,
   updateBudget,
 } from '../../lib/budgets'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useToast } from '../../contexts/ToastContext'
+import { SkeletonCard } from '../../components/ui/Skeleton'
 
 const emptyForm = {
   category: '',
@@ -36,7 +39,7 @@ function getBudgetUsage(budget) {
       remaining,
       status: 'melewati budget',
       colorClass: 'bg-red-600',
-      badgeClass: 'bg-red-100 text-red-700',
+      badgeClass: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
     }
   }
 
@@ -47,7 +50,7 @@ function getBudgetUsage(budget) {
       remaining,
       status: 'peringatan',
       colorClass: 'bg-amber-500',
-      badgeClass: 'bg-amber-100 text-amber-700',
+      badgeClass: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
     }
   }
 
@@ -57,7 +60,7 @@ function getBudgetUsage(budget) {
     remaining,
     status: 'aman',
     colorClass: 'bg-emerald-600',
-    badgeClass: 'bg-emerald-100 text-emerald-700',
+    badgeClass: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
   }
 }
 
@@ -65,24 +68,23 @@ export default function Budgets() {
   const [budgets, setBudgets] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const { theme } = useTheme()
+  const { addToast } = useToast()
 
   useEffect(() => {
     loadBudgets()
   }, [])
 
   async function loadBudgets() {
-    setError('')
     setIsLoading(true)
 
     try {
       const data = await getBudgetsWithSpending()
       setBudgets(data)
     } catch (err) {
-      setError(err.message || 'Gagal memuat budget.')
+      addToast(err.message || 'Gagal memuat budget.', 'error')
     } finally {
       setIsLoading(false)
     }
@@ -114,159 +116,151 @@ export default function Budgets() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setError('')
-    setSuccess('')
     setIsSaving(true)
 
     try {
       if (editingId) {
         await updateBudget(editingId, form)
-        setSuccess('Budget berhasil diperbarui.')
+        addToast('Budget berhasil diperbarui.', 'success')
       } else {
         await createBudget(form)
-        setSuccess('Budget berhasil dibuat.')
+        addToast('Budget berhasil dibuat.', 'success')
       }
 
       resetForm()
       await loadBudgets()
     } catch (err) {
-      setError(err.message || 'Gagal menyimpan budget.')
+      addToast(err.message || 'Gagal menyimpan budget.', 'error')
     } finally {
       setIsSaving(false)
     }
   }
 
   async function handleDelete(id) {
-    setError('')
-    setSuccess('')
-
     try {
       await deleteBudget(id)
-      setSuccess('Budget berhasil dihapus.')
+      addToast('Budget berhasil dihapus.', 'success')
       await loadBudgets()
     } catch (err) {
-      setError(err.message || 'Gagal menghapus budget.')
+      addToast(err.message || 'Gagal menghapus budget.', 'error')
     }
   }
 
   return (
     <div className="space-y-6">
       <section>
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
           Dompet AI
         </p>
-        <h2 className="mt-2 text-3xl font-semibold text-slate-950">Budget</h2>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
+        <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">💰 Budget</h2>
+        <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
           Pantau batas pengeluaran per kategori berdasarkan transaksi asli.
         </p>
       </section>
 
-      {error ? (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      ) : null}
-      {success ? (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>
-      ) : null}
-
       <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <form className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
-          <h3 className="text-lg font-semibold text-slate-950">
-            {editingId ? 'Edit budget' : 'Buat budget baru'}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            {editingId ? '✏️ Edit Budget' : '➕ Buat Budget Baru'}
           </h3>
 
-          <div className="mt-5 space-y-4">
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Category</span>
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Kategori</label>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 name="category"
                 type="text"
                 value={form.category}
                 onChange={updateField}
                 required
+                placeholder="Contoh: Makanan"
               />
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Limit amount</span>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Limit Pengeluaran</label>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 min="0"
                 name="limitAmount"
                 type="number"
                 value={form.limitAmount}
                 onChange={updateField}
                 required
+                placeholder="0"
               />
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Period</span>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Periode</label>
               <select
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 name="period"
                 value={form.period}
                 onChange={updateField}
               >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="weekly">Mingguan</option>
+                <option value="monthly">Bulanan</option>
               </select>
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">Start date</span>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Tanggal Mulai</label>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 name="startDate"
                 type="date"
                 value={form.startDate}
                 onChange={updateField}
                 required
               />
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-700">End date</span>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Tanggal Selesai</label>
               <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 name="endDate"
                 type="date"
                 value={form.endDate}
                 onChange={updateField}
                 required
               />
-            </label>
-          </div>
+            </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-              disabled={isSaving}
-              type="submit"
-            >
-              {isSaving ? 'Menyimpan...' : editingId ? 'Simpan' : 'Buat Budget'}
-            </button>
-            {editingId ? (
+            <div className="flex gap-3 pt-2">
               <button
-                className="rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-700"
-                type="button"
-                onClick={resetForm}
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 transition-all"
+                disabled={isSaving}
+                type="submit"
               >
-                Batal
+                {isSaving ? '⏳ Menyimpan...' : editingId ? '💾 Simpan' : '➕ Buat Budget'}
               </button>
-            ) : null}
-          </div>
-        </form>
+              {editingId && (
+                <button
+                  className="rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-2.5 font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  type="button"
+                  onClick={resetForm}
+                >
+                  Batal
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
 
-        <section>
+        <section className="mt-6">
           {isLoading ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-              Memuat budget...
+            <div className="grid gap-4 lg:grid-cols-2">
+              <SkeletonCard />
+              <SkeletonCard />
             </div>
           ) : budgets.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
-              <h3 className="text-lg font-semibold text-slate-950">Belum ada budget</h3>
-              <p className="mt-2 text-sm text-slate-500">
+            <div className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-12 text-center">
+              <p className="text-4xl mb-4">💰</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Belum ada budget</h3>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 Buat budget pertama untuk memantau pengeluaran per kategori.
               </p>
             </div>
@@ -276,48 +270,46 @@ export default function Budgets() {
                 const usage = getBudgetUsage(budget)
 
                 return (
-                  <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={budget.id}>
+                  <article className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm hover:shadow-md transition-shadow" key={budget.id}>
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-950">{budget.category}</h3>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{budget.category}</h3>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                           {budget.start_date} sampai {budget.end_date}
                         </p>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${usage.badgeClass}`}>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${usage.badgeClass}`}>
                         {usage.status}
                       </span>
                     </div>
 
-                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-md bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Limit</p>
-                        <p className="mt-1 font-semibold text-slate-950">{formatCurrency(budget.limit_amount)}</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Limit</p>
+                        <p className="mt-1 font-bold text-slate-900 dark:text-white">{formatCurrency(budget.limit_amount)}</p>
                       </div>
-                      <div className="rounded-md bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Aktual</p>
-                        <p className="mt-1 font-semibold text-slate-950">{formatCurrency(budget.actual_expense)}</p>
+                      <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Aktual</p>
+                        <p className="mt-1 font-bold text-slate-900 dark:text-white">{formatCurrency(budget.actual_expense)}</p>
                       </div>
-                      <div className="rounded-md bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Sisa budget</p>
-                        <p className={`mt-1 font-semibold ${usage.remaining < 0 ? 'text-red-600' : 'text-slate-950'}`}>
+                      <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Sisa</p>
+                        <p className={`mt-1 font-bold ${usage.remaining < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {formatCurrency(usage.remaining)}
                         </p>
                       </div>
-                      <div className="rounded-md bg-slate-50 p-3">
-                        <p className="text-xs text-slate-500">Period</p>
-                        <p className="mt-1 font-semibold capitalize text-slate-950">{budget.period}</p>
+                      <div className="rounded-xl bg-slate-50 dark:bg-slate-900/50 p-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Periode</p>
+                        <p className="mt-1 font-bold capitalize text-slate-900 dark:text-white">{budget.period === 'weekly' ? 'Mingguan' : 'Bulanan'}</p>
                       </div>
                     </div>
 
-                    <div className="mt-5">
+                    <div className="mt-4">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-700">Penggunaan</span>
-                        <span className="font-semibold text-slate-950">
-                          {Math.round(usage.rawPercentage)}%
-                        </span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">Penggunaan</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{Math.round(usage.rawPercentage)}%</span>
                       </div>
-                      <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
                         <div
                           className={`h-full rounded-full transition-all ${usage.colorClass}`}
                           style={{ width: `${usage.percentage}%` }}
@@ -327,18 +319,18 @@ export default function Budgets() {
 
                     <div className="mt-4 flex gap-2">
                       <button
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700"
+                        className="flex-1 rounded-xl border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         type="button"
                         onClick={() => startEdit(budget)}
                       >
-                        Edit
+                        ✏️ Edit
                       </button>
                       <button
-                        className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700"
+                        className="flex-1 rounded-xl border border-red-200 dark:border-red-800 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                         type="button"
                         onClick={() => handleDelete(budget.id)}
                       >
-                        Hapus
+                        🗑️ Hapus
                       </button>
                     </div>
                   </article>

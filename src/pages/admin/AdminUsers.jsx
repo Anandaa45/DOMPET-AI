@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useToast } from '../../contexts/ToastContext'
+import { SkeletonTable } from '../../components/ui/Skeleton'
 import { getAdminUsers } from '../../lib/admin'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const { theme } = useTheme()
+  const { addToast } = useToast()
 
   useEffect(() => {
     async function loadUsers() {
+      setIsLoading(true)
       try {
         const data = await getAdminUsers()
         setUsers(data)
       } catch (err) {
-        setError(err.message || 'Gagal memuat user.')
+        addToast(err.message || 'Gagal memuat user.', 'error')
       } finally {
         setIsLoading(false)
       }
@@ -24,21 +29,17 @@ export default function AdminUsers() {
   return (
     <div className="space-y-6">
       <section>
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Super Admin
         </p>
-        <h2 className="mt-2 text-3xl font-semibold text-zinc-950">Users</h2>
+        <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Users</h2>
       </section>
 
-      {error ? (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      ) : null}
-
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
-              <tr className="border-b border-zinc-200 text-zinc-500">
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                 <th className="py-3 pr-4 font-medium">Nama</th>
                 <th className="py-3 pr-4 font-medium">Email</th>
                 <th className="py-3 pr-4 font-medium">WhatsApp</th>
@@ -48,25 +49,37 @@ export default function AdminUsers() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td className="py-6 text-center text-zinc-500" colSpan="5">Memuat user...</td>
-                </tr>
+                <SkeletonTable rows={5} />
               ) : users.length === 0 ? (
                 <tr>
-                  <td className="py-6 text-center text-zinc-500" colSpan="5">Belum ada user.</td>
+                  <td className="py-6 text-center text-slate-500 dark:text-slate-400" colSpan="5">
+                    <span className="text-2xl mb-2 block">👥</span>
+                    Belum ada user
+                  </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr className="border-b border-zinc-100" key={user.id}>
-                    <td className="py-3 pr-4 font-medium text-zinc-950">{user.full_name || '-'}</td>
-                    <td className="py-3 pr-4 text-zinc-600">{user.email}</td>
-                    <td className="py-3 pr-4 text-zinc-600">{user.whatsapp_number || '-'}</td>
+                  <tr
+                    className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    key={user.id}
+                  >
+                    <td className="py-3 pr-4 font-medium text-slate-900 dark:text-white">
+                      {user.full_name || '-'}
+                    </td>
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{user.email}</td>
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{user.whatsapp_number || '-'}</td>
                     <td className="py-3 pr-4">
-                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                          user.role === 'super_admin'
+                            ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
+                        }`}
+                      >
                         {user.role}
                       </span>
                     </td>
-                    <td className="py-3 text-right text-zinc-600">
+                    <td className="py-3 text-right text-slate-600 dark:text-slate-400">
                       {new Date(user.created_at).toLocaleDateString('id-ID')}
                     </td>
                   </tr>

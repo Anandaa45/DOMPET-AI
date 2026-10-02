@@ -12,6 +12,9 @@ import {
   YAxis,
 } from 'recharts'
 import { getTransactionsByMonth } from '../../lib/transactions'
+import { useTheme } from '../../contexts/ThemeContext'
+import { useToast } from '../../contexts/ToastContext'
+import { SkeletonCard, SkeletonChart } from '../../components/ui/Skeleton'
 
 const monthOptions = [
   { value: 1, label: 'Januari' },
@@ -35,8 +38,9 @@ export default function Reports() {
   const [month, setMonth] = useState(today.getMonth() + 1)
   const [year, setYear] = useState(today.getFullYear())
   const [transactions, setTransactions] = useState([])
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const { theme } = useTheme()
+  const { addToast } = useToast()
 
   useEffect(() => {
     async function loadReport() {
@@ -47,7 +51,7 @@ export default function Reports() {
         const data = await getTransactionsByMonth(year, month)
         setTransactions(data)
       } catch (err) {
-        setError(err.message || 'Gagal memuat laporan.')
+        addToast(err.message || 'Gagal memuat laporan.', 'error')
       } finally {
         setIsLoading(false)
       }
@@ -116,103 +120,151 @@ export default function Reports() {
   }
 
   const cards = [
-    { label: 'Total pemasukan', value: report.totalIncome, color: 'text-emerald-700' },
-    { label: 'Total pengeluaran', value: report.totalExpense, color: 'text-red-600' },
-    { label: 'Saldo akhir bulan', value: report.balance, color: 'text-slate-950' },
+    { label: 'Total pemasukan', value: report.totalIncome, color: 'text-emerald-600 dark:text-emerald-400', icon: '📈' },
+    { label: 'Total pengeluaran', value: report.totalExpense, color: 'text-red-600 dark:text-red-400', icon: '📉' },
+    { label: 'Saldo akhir bulan', value: report.balance, color: 'text-slate-900 dark:text-white', icon: '💰' },
     {
       label: 'Kategori expense terbesar',
       value: report.topExpenseCategory?.category || 'Belum ada',
       detail: report.topExpenseCategory ? formatCurrency(report.topExpenseCategory.amount) : 'Tidak ada expense',
-      color: 'text-slate-950',
+      color: 'text-slate-900 dark:text-white',
       isText: true,
+      icon: '🏷️',
     },
   ]
 
+  function downloadCSV() {
+    const headers = ['Tanggal', 'Deskripsi', 'Kategori', 'Type', 'Source', 'Nominal']
+    const rows = transactions.map((t) => [
+      t.transaction_date,
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+      t.category || '',
+      t.type,
+      t.source || '',
+      t.amount,
+    ])
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `laporan-${month}-${year}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    addToast('Laporan CSV berhasil diunduh.', 'success')
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header with Filters and Export */}
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+          <p className="text-sm font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
             Dompet AI
           </p>
-          <h2 className="mt-2 text-3xl font-semibold text-slate-950">Reports</h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">📊 Laporan</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Laporan bulanan berdasarkan transaksi asli dari Supabase.
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Bulan</span>
-            <select
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              value={month}
-              onChange={(event) => setMonth(Number(event.target.value))}
-            >
-              {monthOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="flex items-center gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Bulan</label>
+              <select
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                value={month}
+                onChange={(event) => setMonth(Number(event.target.value))}
+              >
+                {monthOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Tahun</span>
-            <select
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              value={year}
-              onChange={(event) => setYear(Number(event.target.value))}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Tahun</label>
+              <select
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                value={year}
+                onChange={(event) => setYear(Number(event.target.value))}
+              >
+                {yearOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-end pb-1">
+            <button
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 dark:hover:bg-emerald-400 transition-colors disabled:opacity-50"
+              onClick={downloadCSV}
+              disabled={!report.hasTransactions}
             >
-              {yearOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
+              📥 Ekspor CSV
+            </button>
+          </div>
         </div>
       </section>
 
-      {error ? (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      ) : null}
+      {/* Summary Cards */}
+      {isLoading ? (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </section>
+      ) : (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm" key={card.label}>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{card.icon}</span>
+                <div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{card.label}</p>
+                  <p className={`mt-1 text-2xl font-bold ${card.color}`}>
+                    {card.isText ? card.value : formatCurrency(card.value)}
+                  </p>
+                  {card.detail && (
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{card.detail}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
-      {!isLoading && !error && !report.hasTransactions ? (
-        <section className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">Belum ada transaksi pada bulan ini</h3>
-          <p className="mt-2 text-sm text-slate-600">
+      {!isLoading && !report.hasTransactions ? (
+        <section className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-8 text-center">
+          <p className="text-4xl mb-4">📭</p>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Belum ada transaksi pada bulan ini</h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Pilih bulan lain atau tambahkan transaksi baru untuk melihat laporan.
           </p>
         </section>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" key={card.label}>
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className={`mt-2 text-2xl font-semibold ${card.color}`}>
-              {card.isText ? card.value : formatCurrency(card.value)}
-            </p>
-            {card.detail ? (
-              <p className="mt-1 text-sm text-slate-500">{card.detail}</p>
-            ) : null}
-          </div>
-        ))}
-      </section>
-
+      {/* Charts */}
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">Pengeluaran per kategori</h3>
-          <p className="text-sm text-slate-500">Distribusi expense pada bulan terpilih.</p>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Pengeluaran per Kategori</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Distribusi expense pada bulan terpilih.</p>
+          </div>
 
           <div className="mt-5 h-80">
             {isLoading ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                Memuat grafik...
-              </div>
+              <SkeletonChart />
             ) : report.categoryChart.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
                 Belum ada data pengeluaran.
               </div>
             ) : (
@@ -230,31 +282,31 @@ export default function Reports() {
                       <Cell fill={chartColors[index % chartColors.length]} key={entry.category} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-950">Tren harian</h3>
-          <p className="text-sm text-slate-500">Pemasukan dan pengeluaran per tanggal.</p>
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Tren Harian</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Pemasukan dan pengeluaran per tanggal.</p>
+          </div>
 
           <div className="mt-5 h-80">
             {isLoading ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                Memuat tren...
-              </div>
+              <SkeletonChart />
             ) : (
               <ResponsiveContainer height="100%" width="100%">
                 <LineChart data={report.trend}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="day" stroke="#64748b" />
                   <YAxis stroke="#64748b" tickFormatter={(value) => `${Number(value) / 1000}k`} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Line dataKey="income" name="Income" stroke="#059669" strokeWidth={2} type="monotone" />
-                  <Line dataKey="expense" name="Expense" stroke="#dc2626" strokeWidth={2} type="monotone" />
+                  <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                  <Line dataKey="income" name="Income" stroke="#059669" strokeWidth={2} type="monotone" dot={false} />
+                  <Line dataKey="expense" name="Expense" stroke="#dc2626" strokeWidth={2} type="monotone" dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -262,13 +314,14 @@ export default function Reports() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-950">Ringkasan transaksi</h3>
+      {/* Transaction Table */}
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white">📋 Ringkasan Transaksi</h3>
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
+              <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
                 <th className="py-3 pr-4 font-medium">Tanggal</th>
                 <th className="py-3 pr-4 font-medium">Deskripsi</th>
                 <th className="py-3 pr-4 font-medium">Kategori</th>
@@ -277,38 +330,36 @@ export default function Reports() {
                 <th className="py-3 text-right font-medium">Nominal</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {isLoading ? (
                 <tr>
-                  <td className="py-6 text-center text-slate-500" colSpan="6">
+                  <td className="py-6 text-center text-slate-500 dark:text-slate-400" colSpan="6">
                     Memuat transaksi...
                   </td>
                 </tr>
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td className="py-6 text-center text-slate-500" colSpan="6">
+                  <td className="py-6 text-center text-slate-500 dark:text-slate-400" colSpan="6">
                     Belum ada transaksi pada bulan terpilih.
                   </td>
                 </tr>
               ) : (
                 transactions.map((transaction) => (
-                  <tr className="border-b border-slate-100" key={transaction.id}>
-                    <td className="py-3 pr-4 text-slate-600">{transaction.transaction_date}</td>
-                    <td className="py-3 pr-4 font-medium text-slate-950">{transaction.description}</td>
-                    <td className="py-3 pr-4 text-slate-600">{transaction.category || '-'}</td>
+                  <tr className="hover:bg-slate-50 dark:hover:bg-slate-700/50" key={transaction.id}>
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{transaction.transaction_date}</td>
+                    <td className="py-3 pr-4 font-medium text-slate-900 dark:text-white">{transaction.description}</td>
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{transaction.category || '-'}</td>
                     <td className="py-3 pr-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          transaction.type === 'income'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {transaction.type}
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        transaction.type === 'income'
+                          ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                      }`}>
+                        {transaction.type === 'income' ? '📈' : '📉'} {transaction.type}
                       </span>
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">{transaction.source || '-'}</td>
-                    <td className="py-3 text-right font-medium text-slate-950">
+                    <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{transaction.source || '-'}</td>
+                    <td className="py-3 text-right font-bold text-slate-900 dark:text-white">
                       {formatCurrency(transaction.amount)}
                     </td>
                   </tr>

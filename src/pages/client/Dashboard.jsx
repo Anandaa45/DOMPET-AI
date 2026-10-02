@@ -1,39 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  Legend,
-} from 'recharts'
 import { getBudgetsWithSpending } from '../../lib/budgets'
 import { getSavingGoals } from '../../lib/savingGoals'
-import { getCurrentUserTransactions } from '../../lib/transactions'
+import { getCurrentUserTransactions, createTransaction } from '../../lib/transactions'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useToast } from '../../contexts/ToastContext'
 import { SkeletonCard, SkeletonChart, SkeletonTable } from '../../components/ui/Skeleton'
-
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+import ExpensePieChart from '../../components/charts/ExpensePieChart'
+import MonthlyBarChart from '../../components/charts/MonthlyBarChart'
+import BudgetProgressChart from '../../components/charts/BudgetProgressChart'
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([])
   const [savingGoals, setSavingGoals] = useState([])
   const [budgets, setBudgets] = useState([])
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickForm, setQuickForm] = useState({
+    type: 'expense',
+    description: '',
+    amount: '',
+    category: 'Lainnya',
+    transactionDate: new Date().toISOString().slice(0, 10),
+  })
+  const [isSaving, setIsSaving] = useState(false)
   const { theme } = useTheme()
   const { addToast } = useToast()
 
   useEffect(() => {
     async function loadDashboard() {
-      setError('')
       setIsLoading(true)
 
       try {
@@ -46,7 +41,7 @@ export default function Dashboard() {
         setSavingGoals(goalsData)
         setBudgets(budgetsData)
       } catch (err) {
-        setError(err.message || 'Gagal memuat dashboard.')
+        addToast(err.message || 'Gagal memuat dashboard.', 'error')
       } finally {
         setIsLoading(false)
       }
@@ -54,6 +49,41 @@ export default function Dashboard() {
 
     loadDashboard()
   }, [])
+
+  async function handleQuickAdd(e) {
+    e.preventDefault()
+    if (!quickForm.description || !quickForm.amount) {
+      addToast('Deskripsi dan jumlah harus diisi', 'error')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await createTransaction({
+        type: quickForm.type,
+        description: quickForm.description,
+        amount: Number(quickForm.amount),
+        category: quickForm.category,
+        transaction_date: quickForm.transactionDate,
+      })
+      addToast('Transaksi berhasil ditambahkan!', 'success')
+      setShowQuickAdd(false)
+      setQuickForm({
+        type: 'expense',
+        description: '',
+        amount: '',
+        category: 'Lainnya',
+        transactionDate: new Date().toISOString().slice(0, 10),
+      })
+      // Reload dashboard
+      const data = await getCurrentUserTransactions()
+      setTransactions(data)
+    } catch (err) {
+      addToast(err.message || 'Gagal menambahkan transaksi', 'error')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const dashboard = useMemo(() => {
     const now = new Date()
@@ -186,80 +216,95 @@ export default function Dashboard() {
 
   const cards = [
     {
+      label: 'Total Pemasukan',
+      value: dashboard.totalIncome,
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-500/5',
+      icon: '💰',
+      detail: `${formatCurrency(dashboard.monthlyIncome)} bulan ini`,
+    },
+    {
+      label: 'Total Pengeluaran',
+      value: dashboard.totalExpense,
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-50 dark:bg-red-500/5',
+      icon: '💸',
+      detail: `${formatCurrency(dashboard.monthlyExpense)} bulan ini`,
+    },
+    {
       label: 'Saldo',
       value: dashboard.balance,
-      color: 'text-slate-900 dark:text-white',
+      color: dashboard.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400',
+      bgColor: dashboard.balance >= 0 ? 'bg-emerald-50 dark:bg-emerald-500/5' : 'bg-red-50 dark:bg-red-500/5',
+      icon: '🏦',
+      detail: dashboard.topExpenseCategory ? `Terbesar: ${dashboard.topExpenseCategory.category}` : '',
     },
     {
-      label: 'Pemasukan bulan ini',
-      value: dashboard.monthlyIncome,
-      color: 'text-emerald-700 dark:text-emerald-400',
-    },
-    {
-      label: 'Pengeluaran bulan ini',
-      value: dashboard.monthlyExpense,
-      color: 'text-red-600 dark:text-red-400',
-    },
-    {
-      label: 'Kategori expense terbesar',
-      value: dashboard.topExpenseCategory
-        ? dashboard.topExpenseCategory.category
-        : 'Belum ada',
-      detail: dashboard.topExpenseCategory
-        ? formatCurrency(dashboard.topExpenseCategory.amount)
-        : 'Tidak ada expense bulan ini',
-      color: 'text-slate-900 dark:text-white',
-      isText: true,
+      label: 'Transaksi',
+      value: transactions.length,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-500/5',
+      icon: '📋',
+      detail: `Total ${transactions.length} transaksi`,
     },
   ]
 
-  const pieColors = ['#ef4444', '#f97316', '#eab308', '#14b8a6', '#6366f1']
-
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-2">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-          Dompet AI
-        </p>
-        <h2 className="text-3xl font-semibold text-slate-900 dark:text-white">Dashboard</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Ringkasan transaksi manual dan aktivitas keuangan terbaru.
-        </p>
-      </section>
-
-      {error ? (
-        <p className="rounded-md bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">{error}</p>
-      ) : null}
-
-      {!isLoading && !error && !dashboard.hasTransactions ? (
-        <section className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-8 text-center shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Belum ada transaksi</h3>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Tambahkan transaksi pertama kamu di halaman Transactions untuk melihat saldo, grafik, dan ringkasan keuangan.
+      {/* Header */}
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            Dompet AI
           </p>
-        </section>
-      ) : null}
+          <h2 className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Ringkasan transaksi manual dan aktivitas keuangan terbaru.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowQuickAdd(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 dark:bg-emerald-500 px-5 py-3 font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-400 transition-all"
+        >
+          <span>➕</span> Tambah Cepat
+        </button>
+      </section>
 
       {isLoading ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
         </section>
       ) : (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm" key={card.label}>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{card.label}</p>
-              <p className={`mt-2 text-2xl font-semibold ${card.color}`}>
-                {card.isText ? card.value : formatCurrency(card.value)}
-              </p>
-              {card.detail ? (
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{card.detail}</p>
-              ) : null}
+            <div
+              className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm ${card.bgColor} dark:bg-opacity-50`}
+              key={card.label}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{card.label}</p>
+                  <p className={`mt-2 text-2xl font-bold ${card.color}`}>
+                    {typeof card.value === 'number' ? formatCurrency(card.value) : card.value}
+                  </p>
+                  {card.detail && (
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{card.detail}</p>
+                  )}
+                </div>
+                <span className="text-3xl">{card.icon}</span>
+              </div>
             </div>
           ))}
+        </section>
+      )}
+
+      {!isLoading && !dashboard.hasTransactions && (
+        <section className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
+          <p className="text-5xl mb-4">📭</p>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Belum ada transaksi</h3>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Klik tombol <strong>Tambah Cepat</strong> untuk menambahkan transaksi pertama kamu.
+          </p>
         </section>
       )}
 
@@ -270,16 +315,17 @@ export default function Dashboard() {
         </section>
       ) : (
         <section className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
+          {/* Saving Goals Card */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Target Tabungan Utama</p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                <p className="text-sm text-slate-500 dark:text-slate-400">🎯 Target Tabungan</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
                   {mainSavingGoal ? mainSavingGoal.title : 'Belum ada target aktif'}
                 </h3>
               </div>
-              <Link className="text-sm font-medium text-emerald-700 dark:text-emerald-400" to="/saving-goals">
-                Lihat Target
+              <Link className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:underline" to="/saving-goals">
+                Lihat Semua →
               </Link>
             </div>
 
@@ -288,25 +334,25 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Terkumpul</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
                       {formatCurrency(mainSavingGoal.current_amount)}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-sm text-slate-500 dark:text-slate-400">Target</p>
-                    <p className="mt-1 font-semibold text-slate-900 dark:text-white">
+                    <p className="mt-1 font-bold text-slate-900 dark:text-white">
                       {formatCurrency(mainSavingGoal.target_amount)}
                     </p>
                   </div>
                 </div>
-                <div className="mt-5">
+                <div className="mt-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-slate-700 dark:text-slate-300">Progress</span>
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">{mainSavingGoal.progress}%</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{mainSavingGoal.progress}%</span>
                   </div>
-                  <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                  <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     <div
-                      className="h-full rounded-full bg-emerald-600 transition-all"
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
                       style={{ width: `${mainSavingGoal.progress}%` }}
                     />
                   </div>
@@ -319,31 +365,32 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
+          {/* Budget Summary Card */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Status Budget</p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                <p className="text-sm text-slate-500 dark:text-slate-400">📊 Status Budget</p>
+                <h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
                   Ringkasan penggunaan budget
                 </h3>
               </div>
-              <Link className="text-sm font-medium text-emerald-700 dark:text-emerald-400" to="/budgets">
-                Lihat Budget
+              <Link className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 hover:underline" to="/budgets">
+                Lihat Semua →
               </Link>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-md bg-slate-50 dark:bg-slate-700/50 p-3">
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-700/50 p-4 text-center">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Budget aktif</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{budgetSummary.active}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{budgetSummary.active}</p>
               </div>
-              <div className="rounded-md bg-amber-50 dark:bg-amber-500/10 p-3">
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 p-4 text-center">
                 <p className="text-xs text-amber-700 dark:text-amber-400">Hampir habis</p>
-                <p className="mt-1 text-2xl font-semibold text-amber-700 dark:text-amber-400">{budgetSummary.nearLimit}</p>
+                <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{budgetSummary.nearLimit}</p>
               </div>
-              <div className="rounded-md bg-red-50 dark:bg-red-500/10 p-3">
+              <div className="rounded-xl bg-red-50 dark:bg-red-500/10 p-4 text-center">
                 <p className="text-xs text-red-700 dark:text-red-400">Terlewati</p>
-                <p className="mt-1 text-2xl font-semibold text-red-700 dark:text-red-400">{budgetSummary.exceeded}</p>
+                <p className="mt-1 text-2xl font-bold text-red-700 dark:text-red-400">{budgetSummary.exceeded}</p>
               </div>
             </div>
           </div>
@@ -357,73 +404,16 @@ export default function Dashboard() {
         </section>
       ) : (
         <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Arus kas 6 bulan</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Income dan expense per bulan.</p>
-              </div>
-            </div>
-
-            <div className="mt-5 h-80">
-              <ResponsiveContainer height="100%" width="100%">
-                <BarChart data={dashboard.monthlyChart}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" stroke="#64748b" />
-                  <YAxis stroke="#64748b" tickFormatter={(value) => `${Number(value) / 1000}k`} />
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Bar dataKey="income" fill="#059669" name="Income" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" fill="#dc2626" name="Expense" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Kategori expense bulan ini</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Lima kategori pengeluaran terbesar bulan ini.</p>
-
-            <div className="mt-5 h-80">
-              {dashboard.categoryChart.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-                  Belum ada expense bulan ini.
-                </div>
-              ) : (
-                <ResponsiveContainer height="100%" width="100%">
-                  <PieChart>
-                    <Pie
-                      data={dashboard.categoryChart}
-                      dataKey="amount"
-                      innerRadius={62}
-                      nameKey="category"
-                      outerRadius={100}
-                      paddingAngle={3}
-                    >
-                      {dashboard.categoryChart.map((entry, index) => (
-                        <Cell fill={pieColors[index % pieColors.length]} key={entry.category} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {dashboard.categoryChart.map((item, index) => (
-                <div className="flex items-center justify-between text-sm" key={item.category}>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: pieColors[index % pieColors.length] }}
-                    />
-                    <span className="text-slate-700 dark:text-slate-300">{item.category}</span>
-                  </div>
-                  <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(item.amount)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <MonthlyBarChart
+            data={dashboard.monthlyChart}
+            isLoading={isLoading}
+            title="Arus kas 6 bulan"
+          />
+          <ExpensePieChart
+            data={dashboard.categoryChart}
+            isLoading={isLoading}
+            title="Kategori expense bulan ini"
+          />
         </section>
       )}
 
@@ -485,6 +475,115 @@ export default function Dashboard() {
             </table>
           </div>
         </section>
+      )}
+
+      {/* Quick Add Modal */}
+      {showQuickAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">➕ Tambah Transaksi Cepat</h3>
+              <button
+                onClick={() => setShowQuickAdd(false)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleQuickAdd} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setQuickForm({ ...quickForm, type: 'expense' })}
+                  className={`rounded-xl border-2 px-4 py-3 font-semibold transition-all ${
+                    quickForm.type === 'expense'
+                      ? 'border-red-500 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  💸 Pengeluaran
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickForm({ ...quickForm, type: 'income' })}
+                  className={`rounded-xl border-2 px-4 py-3 font-semibold transition-all ${
+                    quickForm.type === 'income'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  💰 Pemasukan
+                </button>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Deskripsi
+                </label>
+                <input
+                  type="text"
+                  value={quickForm.description}
+                  onChange={(e) => setQuickForm({ ...quickForm, description: e.target.value })}
+                  placeholder="Contoh: Belanja bulanan"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Jumlah (Rp)
+                </label>
+                <input
+                  type="number"
+                  value={quickForm.amount}
+                  onChange={(e) => setQuickForm({ ...quickForm, amount: e.target.value })}
+                  placeholder="10000"
+                  min="0"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Kategori
+                </label>
+                <select
+                  value={quickForm.category}
+                  onChange={(e) => setQuickForm({ ...quickForm, category: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="Makanan">🍔 Makanan</option>
+                  <option value="Transportasi">🚗 Transportasi</option>
+                  <option value="Belanja Harian">🛒 Belanja Harian</option>
+                  <option value="Kesehatan">🏥 Kesehatan</option>
+                  <option value="Pendidikan">📚 Pendidikan</option>
+                  <option value="Tagihan">📄 Tagihan</option>
+                  <option value="Hiburan">🎬 Hiburan</option>
+                  <option value="Gaji">💼 Gaji</option>
+                  <option value="Uang Jajan">💵 Uang Jajan</option>
+                  <option value="Lainnya">📦 Lainnya</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Tanggal
+                </label>
+                <input
+                  type="date"
+                  value={quickForm.transactionDate}
+                  onChange={(e) => setQuickForm({ ...quickForm, transactionDate: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="w-full rounded-xl bg-emerald-600 dark:bg-emerald-500 py-3 font-bold text-white hover:bg-emerald-700 dark:hover:bg-emerald-400 disabled:opacity-50 transition-all"
+              >
+                {isSaving ? '⏳ Menyimpan...' : '✅ Simpan Transaksi'}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )

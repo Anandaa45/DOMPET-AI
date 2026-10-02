@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext'
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { to: '/transactions', label: 'Transaksi', icon: '💳' },
+  { to: '/categories', label: 'Kategori', icon: '📂' },
   { to: '/receipt-scan', label: 'Scan Struk', icon: '📸' },
   { to: '/whatsapp', label: 'WhatsApp Bot', icon: '💬' },
   { to: '/reports', label: 'Laporan', icon: '📈' },
@@ -67,9 +68,7 @@ export default function ClientLayout() {
                   >
                     <span className="text-lg">{item.icon}</span>
                     {item.label}
-                    {isActive && (
-                      <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
-                    )}
+                    {(({ isActive }) => isActive ? <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500" /> : null)({ isActive: true })}
                   </NavLink>
                 ))}
               </div>
