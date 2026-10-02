@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import aiRoutes from './routes/aiRoutes.js'
+import adminRoutes from './routes/adminRoutes.js'
 import healthRoutes from './routes/healthRoutes.js'
 import webhookRoutes from './routes/webhookRoutes.js'
 import whatsappRoutes from './routes/whatsappRoutes.js'
@@ -18,6 +19,9 @@ app.get('/', (req, res) => {
       health: 'GET /health',
       parseReceipt: 'POST /api/ai/parse-receipt',
       parseTransaction: 'POST /api/ai/parse-transaction',
+      adminStats: 'GET /api/admin/stats',
+      adminUsers: 'GET /api/admin/users',
+      adminLogs: 'GET /api/admin/logs',
       whatsappStatus: 'GET /api/whatsapp/status',
       whatsappWebhookVerify: 'GET /api/whatsapp/webhook',
       whatsappWebhookReceive: 'POST /api/whatsapp/webhook',
@@ -29,6 +33,7 @@ app.get('/', (req, res) => {
 
 app.use(healthRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/whatsapp', whatsappRoutes)
 app.use(webhookRoutes)
 
