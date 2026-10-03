@@ -13,6 +13,7 @@ const allowedCategories = new Set([
   'Hiburan',
   'Gaji',
   'Uang Jajan',
+  'Hadiah',
   'Lainnya',
 ])
 const transactionResponseSchema = {
@@ -37,6 +38,7 @@ const transactionResponseSchema = {
           'Hiburan',
           'Gaji',
           'Uang Jajan',
+          'Hadiah',
           'Lainnya',
         ],
       },
@@ -256,8 +258,8 @@ Aturan:
 - Jangan mengarang nominal.
 - Jika nominal tidak ditemukan, balas array kosong [].
 - category wajib salah satu dari:
-  Makanan, Transportasi, Belanja Harian, Kesehatan, Pendidikan, Tagihan, Hiburan, Gaji, Uang Jajan, Lainnya.
-- Gunakan Gaji untuk gaji/upah/salary, Uang Jajan untuk uang jajan/saku.
+  Makanan, Transportasi, Belanja Harian, Kesehatan, Pendidikan, Tagihan, Hiburan, Gaji, Uang Jajan, Hadiah, Lainnya.
+- Gunakan Gaji untuk gaji/upah/salary, Uang Jajan untuk uang jajan/saku, Hadiah untuk hadiah/hadiah uang.
 - Description singkat dan natural dari transaksi.
 
 Contoh:

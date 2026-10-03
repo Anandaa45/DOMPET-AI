@@ -36,6 +36,7 @@ const categoryOptions = [
   'Hiburan',
   'Gaji',
   'Uang Jajan',
+  'Hadiah',
   'Lainnya',
 ]
 

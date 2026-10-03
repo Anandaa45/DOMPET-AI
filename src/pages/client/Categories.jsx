@@ -14,6 +14,7 @@ const DEFAULT_CATEGORIES = [
   { id: 'entertainment', name: 'Hiburan', emoji: '🎬', type: 'expense', color: '#06b6d4' },
   { id: 'salary', name: 'Gaji', emoji: '💼', type: 'income', color: '#22c55e' },
   { id: 'allowance', name: 'Uang Jajan', emoji: '💵', type: 'income', color: '#14b8a6' },
+  { id: 'gift', name: 'Hadiah', emoji: '🎁', type: 'income', color: '#a855f7' },
   { id: 'other', name: 'Lainnya', emoji: '📦', type: 'both', color: '#6b7280' },
 ]
 
