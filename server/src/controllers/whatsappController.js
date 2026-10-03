@@ -1,8 +1,30 @@
+import { sendWhatsAppText } from '../whatsapp.js'
+import { logSystemEvent } from '../logger.js'
+
 export function getWhatsAppStatus(req, res) {
   res.json({
     ok: true,
     verifyTokenConfigured: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
   })
+}
+
+export async function sendWhatsAppMessage(req, res, next) {
+  try {
+    const { to, message } = req.body
+
+    if (!to || !message) {
+      return res.status(400).json({ ok: false, message: 'Field "to" dan "message" wajib diisi' })
+    }
+
+    const result = await sendWhatsAppText(to, message)
+
+    logSystemEvent('whatsapp_send', `WhatsApp sent to ${to}`, { to, messageId: result.messages?.[0]?.id })
+
+    res.json({ ok: true, data: result })
+  } catch (error) {
+    console.error('sendWhatsAppMessage error:', error)
+    next(error)
+  }
 }
 
 export function verifyWhatsAppWebhook(req, res) {

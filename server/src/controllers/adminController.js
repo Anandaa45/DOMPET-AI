@@ -35,7 +35,7 @@ export async function getAdminDashboardStats(req, res, next) {
     }
 
     // Log the RPC call
-    logSystemEvent('admin_dashboard_stats', 'info', 'Admin dashboard stats fetched', { caller: req.ip })
+    logSystemEvent('admin_dashboard_stats', 'Admin dashboard stats fetched', { caller: req.ip })
 
     res.json({ ok: true, data: statsData })
   } catch (error) {
@@ -57,7 +57,7 @@ export async function getAdminUsers(req, res, next) {
       return res.json({ ok: true, data: profilesData })
     }
 
-    logSystemEvent('admin_users_list', 'info', 'Admin users list fetched', { count: data?.length || 0 })
+    logSystemEvent('admin_users_list', 'Admin users list fetched', { count: data?.length || 0 })
     res.json({ ok: true, data })
   } catch (error) {
     console.error('getAdminUsers error:', error)
@@ -83,7 +83,7 @@ export async function getAdminLogs(req, res, next) {
       return res.json({ ok: true, data: logsData })
     }
 
-    logSystemEvent('admin_logs_list', 'info', 'Admin logs fetched', { count: data?.length || 0, limit })
+    logSystemEvent('admin_logs_list', 'Admin logs fetched', { count: data?.length || 0, limit })
     res.json({ ok: true, data })
   } catch (error) {
     console.error('getAdminLogs error:', error)
@@ -109,7 +109,7 @@ export async function updateUserRole(req, res, next) {
 
     if (error) throw error
 
-    logSystemEvent('admin_update_role', 'info', 'User role updated', { userId, role, caller: req.ip })
+    logSystemEvent('admin_update_role', 'User role updated', { userId, role, caller: req.ip })
     res.json({ ok: true, message: 'Role berhasil diupdate' })
   } catch (error) {
     console.error('updateUserRole error:', error)
