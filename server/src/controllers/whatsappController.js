@@ -1,5 +1,6 @@
 import { sendWhatsAppText } from '../whatsapp.js'
 import { logSystemEvent } from '../logger.js'
+import { processWhatsAppTextMessage, processWhatsAppImageMessage } from '../messageProcessor.js'
 
 export function getWhatsAppStatus(req, res) {
   res.json({
@@ -40,7 +41,7 @@ export function verifyWhatsAppWebhook(req, res) {
   res.sendStatus(403)
 }
 
-export function receiveWhatsAppWebhook(req, res) {
+export async function receiveWhatsAppWebhook(req, res, next) {
   const payload = req.body
 
   console.log('WhatsApp webhook payload:', JSON.stringify(payload, null, 2))
@@ -55,6 +56,17 @@ export function receiveWhatsAppWebhook(req, res) {
       type: message.type || null,
       text: message.text?.body || null,
     })
+
+    try {
+      if (message.type === 'text') {
+        await processWhatsAppTextMessage(message)
+      } else if (message.type === 'image') {
+        await processWhatsAppImageMessage(message)
+      }
+    } catch (error) {
+      console.error('Error processing WhatsApp message:', error)
+      // Don't fail the webhook - just log and continue
+    }
   }
 
   res.sendStatus(200)
