@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useToast } from '../../contexts/ToastContext'
 import { SkeletonTable } from '../../components/ui/Skeleton'
-import { getAdminUsers } from '../../lib/admin'
+import { getAdminUsers, updateUserRole } from '../../lib/admin'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -25,6 +25,16 @@ export default function AdminUsers() {
 
     loadUsers()
   }, [])
+
+  async function handleRoleChange(userId, newRole) {
+    try {
+      await updateUserRole(userId, newRole)
+      addToast('Role berhasil diupdate', 'success')
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u))
+    } catch (err) {
+      addToast(err.message || 'Gagal mengupdate role', 'error')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -69,15 +79,14 @@ export default function AdminUsers() {
                     <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{user.email}</td>
                     <td className="py-3 pr-4 text-slate-600 dark:text-slate-400">{user.whatsapp_number || '-'}</td>
                     <td className="py-3 pr-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          user.role === 'super_admin'
-                            ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-400'
-                        }`}
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                       >
-                        {user.role}
-                      </span>
+                        <option value="client">Client</option>
+                        <option value="super_admin">Super Admin</option>
+                      </select>
                     </td>
                     <td className="py-3 text-right text-slate-600 dark:text-slate-400">
                       {new Date(user.created_at).toLocaleDateString('id-ID')}
